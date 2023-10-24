@@ -1,4 +1,16 @@
+use std::collections::HashMap;
+
 use wasm_bindgen::prelude::*;
+
+struct Point {
+    id: String,
+    vector: Vec<f64>,
+    payload: HashMap<String, String>,
+}
+
+struct Collection {
+    points: Vec<Point>,
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -18,6 +30,7 @@ fn make_local_storage_collection_name(name: &str) -> String {
     let prefix = "__twellik";
     format!("{prefix}_{name}")
 }
+
 #[wasm_bindgen]
 pub fn create_collection(name: &str) {
     let local_storage_name = make_local_storage_collection_name(&name);
@@ -25,7 +38,14 @@ pub fn create_collection(name: &str) {
     twellik_log(format!("{local_storage_name} collection created.").as_str())
 }
 
+// TODO: how to pass types from/to JS land:
+// https://rustwasm.github.io/wasm-bindgen/reference/arbitrary-data-with-serde.html?highlight=array#javascript-usage
 #[wasm_bindgen]
-pub fn greet(name: &str) {
-    log(&format!("Hello, {}!", name));
+pub fn upsert_points(points: JsValue) {}
+
+/// Reads collection into memory.
+fn read_collection(name: &str) -> Collection {
+    todo!()
 }
+#[wasm_bindgen]
+pub fn scroll_points(query: &str) {}
