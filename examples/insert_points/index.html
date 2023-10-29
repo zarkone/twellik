@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>twellik: vector db for browser</title>
+  </head>
+  <body>
+    <script type="module">
+      // make sure to force-reload
+      import init, { create_collection, upsert_points } from "./twellik.js";
+
+      init().then( () => {
+      create_collection("test_collection");
+      let points = [
+          {"id": 1, "vector": [0.05, 0.61, 0.76, 0.74], "payload": {"text": "A special case of the match condition is the payload match condition. It allows you to search for a specific substring, token or phrase within the payload field."}},
+          {"id": 2, "vector": [0.19, 0.81, 0.75, 0.11], "payload": {"text": "Exact payloads that will match the condition depend on full-payload index configuration. Configuration is defined during the index creation and describe at full-payload index."}},
+          {"id": 3, "vector": [0.36, 0.55, 0.47, 0.94], "payload": {"text": "Nested filters work in the same way as if the nested filter was applied to a single element of the array at a time. Parent document is considered to match the condition if at least one element of the array matches the nested filter."}},
+          {"id": 4, "vector": [0.18, 0.01, 0.85, 0.80], "payload": {"text": "If several values are stored, at least one of them should match the condition. These conditions can only be applied to payloads that match the geo-data format."}}
+      ]
+      upsert_points("test_collection", points )
+     });
+    </script>
+  </body>
+</html>
