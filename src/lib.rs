@@ -13,8 +13,9 @@ struct Point {
     payload: HashMap<String, String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 struct Collection {
-    points: Vec<Point>,
+    pub points: Vec<Point>,
 }
 
 #[wasm_bindgen]
@@ -28,7 +29,7 @@ extern "C" {
     fn local_storage_set_item(key: &str, val: &str);
 
     #[wasm_bindgen(js_namespace = localStorage, js_name = getItem)]
-    fn local_storage_get_item(key: &str, val: &str);
+    fn local_storage_get_item(key: &str) -> String;
 
 }
 
@@ -70,9 +71,20 @@ pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
 }
 
 /// Reads collection into memory.
-fn read_collection(coll_name: &str) -> Collection {
+fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
     let local_storage_name = make_local_storage_collection_name(&coll_name);
-    todo!()
+    let js_points = local_storage_get_item(&local_storage_name);
+    twellik_log(format!("{:?}", js_points).as_str());
+
+    let points = match serde_json::from_str(&js_points) {
+        Ok(p) => p,
+        Err(e) => {
+            let msg = e.to_string();
+            return Err(serde_wasm_bindgen::to_value(&msg)?);
+        }
+    };
+
+    Ok(Collection { points })
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
@@ -96,9 +108,23 @@ fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, 
 /// Searches through points and returns K amount of closest points
 /// which match the query
 /// TODO: support async
-pub fn scroll_points(coll_name: &str, query: &str) {
-    // query.vector: [... f32]
-    // query.payload: { ... }
+pub fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
+    twellik_log("start parsing.");
+
+    let parsed_query: HashMap<String, String> = serde_wasm_bindgen::from_value(query)?;
+    twellik_log(format!("query: {:?}", &parsed_query).as_str());
+
+    let coll = read_collection(coll_name)?;
+    twellik_log(format!("coll: {:?}", &coll).as_str());
+
+    let matched_points: Vec<&Point> = coll
+        .points
+        .iter()
+        .filter(|point| match_payload(&point.payload, &parsed_query))
+        .collect();
+
+    twellik_log(format!("matched: {:?}", &matched_points).as_str());
+    Ok(serde_wasm_bindgen::to_value(&matched_points)?)
 }
 
 #[cfg(test)]
@@ -123,5 +149,23 @@ mod tests {
         let result = match_payload(&item, &query_fields);
 
         assert!(result);
+    }
+
+    #[test]
+    fn match_payload_test_two() {
+        let item = HashMap::from([
+            ("a".to_string(), "one".to_string()),
+            ("b".to_string(), "two".to_string()),
+            ("c".to_string(), "three".to_string()),
+        ]);
+
+        let query_fields = HashMap::from([
+            ("a".to_string(), "one".to_string()),
+            ("b".to_string(), "one".to_string()),
+        ]);
+
+        let result = match_payload(&item, &query_fields);
+
+        assert!(!result);
     }
 }
