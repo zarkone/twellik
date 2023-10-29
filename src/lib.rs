@@ -26,6 +26,10 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = localStorage, js_name = setItem)]
     fn local_storage_set_item(key: &str, val: &str);
+
+    #[wasm_bindgen(js_namespace = localStorage, js_name = getItem)]
+    fn local_storage_get_item(key: &str, val: &str);
+
 }
 
 fn twellik_log(s: &str) {
@@ -49,6 +53,7 @@ pub fn create_collection(name: &str) -> Result<(), JsValue> {
 // https://rustwasm.github.io/wasm-bindgen/reference/arbitrary-data-with-serde.html?highlight=array#javascript-usage
 
 #[wasm_bindgen]
+/// TODO: support async
 pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
     // TODO: probably can just passthrough
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
@@ -56,26 +61,67 @@ pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
         Ok(p) => p,
         Err(e) => e.to_string(),
     };
-    let coll_name_prefixed = make_local_storage_collection_name(&coll_name);
+    let local_storage_name = make_local_storage_collection_name(&coll_name);
 
-    twellik_log(format!("uprerting points in {coll_name}: {:?}", &rs_points).as_str());
-    local_storage_set_item(&coll_name_prefixed, &js_points);
+    twellik_log(format!("upserting points in {local_storage_name}: {:?}", &rs_points).as_str());
+    local_storage_set_item(&local_storage_name, &js_points);
+
     Ok(())
 }
 
 /// Reads collection into memory.
-fn read_collection(name: &str) -> Collection {
+fn read_collection(coll_name: &str) -> Collection {
+    let local_storage_name = make_local_storage_collection_name(&coll_name);
     todo!()
 }
 
+/// Checks if all fields of `query_fields` are eq to those in `item`
+fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, String>) -> bool {
+    for (key, val) in query_fields {
+        let item_val = item.get(key);
+        if let Some(found_key) = item_val {
+            if found_key.eq(val) {
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    true
+}
+
 #[wasm_bindgen]
-pub fn scroll_points(query: &str) {}
+/// Searches through points and returns K amount of closest points
+/// which match the query
+/// TODO: support async
+pub fn scroll_points(coll_name: &str, query: &str) {
+    // query.vector: [... f32]
+    // query.payload: { ... }
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::match_payload;
+    use std::collections::HashMap;
+
     #[test]
-    fn it_works() {
-        let result = 2 + 3;
-        assert_eq!(result, 4);
+    fn match_payload_test_happy() {
+        let item = HashMap::from([
+            ("a".to_string(), "one".to_string()),
+            ("b".to_string(), "two".to_string()),
+            ("c".to_string(), "three".to_string()),
+        ]);
+
+        let query_fields = HashMap::from([
+            ("a".to_string(), "one".to_string()),
+            ("b".to_string(), "two".to_string()),
+            ("c".to_string(), "three".to_string()),
+        ]);
+
+        let result = match_payload(&item, &query_fields);
+
+        assert!(result);
     }
 }
