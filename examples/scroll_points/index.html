@@ -16,14 +16,20 @@
           create_collection(coll);
           let points = [
               {"id": "1", "vector": [0.05, 0.61, 0.76, 0.74], "payload": {"text": "text1"}},
-              {"id": "2", "vector": [0.19, 0.81, 0.75, 0.11], "payload": {"text": "text2"}},
-              {"id": "3", "vector": [0.36, 0.55, 0.47, 0.94], "payload": {"text": "text3"}},
+              {"id": "2", "vector": [0.19, 0.81, 0.75, 0.11], "payload": {"text": "text4"}},
+              {"id": "3", "vector": [0.36, 0.55, 0.47, 0.94], "payload": {"text": "text4"}},
               {"id": "4", "vector": [0.18, 0.01, 0.85, 0.80], "payload": {"text": "text4"}}
           ]
           upsert_points(coll, points)
 
-          let search_res = scroll_points(coll, { text: "text4" })
+          let query = {
+              vector: [0.05, 0.61, 0.76, 0.72],
+              payload: { text: "text4" }
+          }
+
+          let search_res = scroll_points(coll, query)
           console.log(search_res)
+
      });
     </script>
   </body>

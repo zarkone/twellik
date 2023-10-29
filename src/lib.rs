@@ -1,3 +1,4 @@
+mod cosine;
 use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
@@ -6,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_wasm_bindgen;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Point {
     id: String,
     vector: Vec<f64>,
@@ -16,6 +17,18 @@ struct Point {
 #[derive(Serialize, Deserialize, Debug)]
 struct Collection {
     pub points: Vec<Point>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Query {
+    vector: Vec<f64>,
+    payload: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct QueryResult {
+    point: Point,
+    distance: f64,
 }
 
 #[wasm_bindgen]
@@ -88,6 +101,7 @@ fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
+/// TODO: empty query to always true
 fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, String>) -> bool {
     for (key, val) in query_fields {
         let item_val = item.get(key);
@@ -111,17 +125,35 @@ fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, 
 pub fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
     twellik_log("start parsing.");
 
-    let parsed_query: HashMap<String, String> = serde_wasm_bindgen::from_value(query)?;
+    let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
     twellik_log(format!("query: {:?}", &parsed_query).as_str());
 
     let coll = read_collection(coll_name)?;
     twellik_log(format!("coll: {:?}", &coll).as_str());
 
-    let matched_points: Vec<&Point> = coll
+    let mut matched_points: Vec<QueryResult> = coll
         .points
         .iter()
-        .filter(|point| match_payload(&point.payload, &parsed_query))
+        .filter(|point| match_payload(&point.payload, &parsed_query.payload))
+        .map(|point| {
+            let distance = cosine::distance(&parsed_query.vector, &point.vector);
+            QueryResult {
+                point: point.clone(),
+                distance,
+            }
+        })
         .collect();
+
+    matched_points.sort_by(|a, b| match a.distance.partial_cmp(&b.distance) {
+        Some(r) => r,
+        None => {
+            println!(
+                "panic! comparison of these two numbers failed: {0} and {1}",
+                &a.distance, &b.distance
+            );
+            panic!();
+        }
+    });
 
     twellik_log(format!("matched: {:?}", &matched_points).as_str());
     Ok(serde_wasm_bindgen::to_value(&matched_points)?)
