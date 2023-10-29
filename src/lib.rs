@@ -56,8 +56,10 @@ pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
         Ok(p) => p,
         Err(e) => e.to_string(),
     };
+    let coll_name_prefixed = make_local_storage_collection_name(&coll_name);
+
     twellik_log(format!("uprerting points in {coll_name}: {:?}", &rs_points).as_str());
-    local_storage_set_item(coll_name, &js_points);
+    local_storage_set_item(&coll_name_prefixed, &js_points);
     Ok(())
 }
 
