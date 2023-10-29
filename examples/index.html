@@ -24,7 +24,8 @@
 
           let query = {
               vector: [0.05, 0.61, 0.76, 0.72],
-              payload: { text: "text4" }
+              payload: { text: "text4" },
+              k: 10
           }
 
           let searchRes = scroll_points(coll, query)
@@ -32,7 +33,8 @@
 
           let emtpyPayloadQuery = {
               vector: [0.05, 0.41, 0.26, 0.12],
-              payload: {}
+              payload: {},
+              k: 3
           }
 
           let emptyQueryRes = scroll_points(coll, emtpyPayloadQuery)

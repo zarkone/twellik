@@ -23,6 +23,7 @@ struct Collection {
 struct Query {
     vector: Vec<f64>,
     payload: HashMap<String, String>,
+    k: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -158,7 +159,10 @@ pub fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue
         }
     });
 
+    let matched_points: Vec<&QueryResult> = matched_points.iter().take(parsed_query.k).collect();
+
     twellik_log(format!("matched: {:?}", &matched_points).as_str());
+
     Ok(serde_wasm_bindgen::to_value(&matched_points)?)
 }
 
