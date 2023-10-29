@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
+use serde::{Deserialize, Serialize};
+use serde_wasm_bindgen;
+
+#[derive(Serialize, Deserialize, Debug)]
 struct Point {
     id: String,
     vector: Vec<f64>,
@@ -42,8 +46,10 @@ pub fn create_collection(name: &str) {
 // https://rustwasm.github.io/wasm-bindgen/reference/arbitrary-data-with-serde.html?highlight=array#javascript-usage
 
 #[wasm_bindgen]
-pub fn upsert_points(coll_name: &str, points: JsValue) {
-    twellik_log(format!("points: {:?}", points).as_str());
+pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
+    let p: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
+    twellik_log(format!("points: {:?}", &p).as_str());
+    Ok(())
 }
 
 /// Reads collection into memory.
