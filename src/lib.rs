@@ -101,8 +101,11 @@ fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
-/// TODO: empty query to always true
 fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, String>) -> bool {
+    if query_fields.is_empty() {
+        return true;
+    }
+
     for (key, val) in query_fields {
         let item_val = item.get(key);
         if let Some(found_key) = item_val {
