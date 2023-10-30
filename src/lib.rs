@@ -43,7 +43,7 @@ extern "C" {
     fn local_storage_set_item(key: &str, val: &str);
 
     #[wasm_bindgen(js_namespace = localStorage, js_name = getItem)]
-    fn local_storage_get_item(key: &str) -> String;
+    fn local_storage_get_item(key: &str) -> Option<String>;
 
 }
 
@@ -58,9 +58,14 @@ fn make_local_storage_collection_name(name: &str) -> String {
 #[wasm_bindgen]
 pub fn create_collection(name: &str) -> Result<(), JsValue> {
     let local_storage_name = make_local_storage_collection_name(&name);
-
-    local_storage_set_item(&local_storage_name, &"");
-    twellik_log(format!("{local_storage_name} collection created.").as_str());
+    if let Some(_) = local_storage_get_item(&local_storage_name) {
+        twellik_log(
+            format!("{local_storage_name} collection exist, sipping collection creation.").as_str(),
+        );
+    } else {
+        local_storage_set_item(&local_storage_name, &"");
+        twellik_log(format!("{local_storage_name} collection created.").as_str());
+    }
     Ok(())
 }
 
@@ -87,18 +92,23 @@ pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
 /// Reads collection into memory.
 fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
     let local_storage_name = make_local_storage_collection_name(&coll_name);
-    let js_points = local_storage_get_item(&local_storage_name);
-    twellik_log(format!("{:?}", js_points).as_str());
 
-    let points = match serde_json::from_str(&js_points) {
-        Ok(p) => p,
-        Err(e) => {
-            let msg = e.to_string();
-            return Err(serde_wasm_bindgen::to_value(&msg)?);
-        }
-    };
+    if let Some(js_points) = local_storage_get_item(&local_storage_name) {
+        twellik_log(format!("{:?}", js_points).as_str());
 
-    Ok(Collection { points })
+        let points = match serde_json::from_str(&js_points) {
+            Ok(p) => p,
+            Err(e) => {
+                let msg = e.to_string();
+                return Err(serde_wasm_bindgen::to_value(&msg)?);
+            }
+        };
+
+        Ok(Collection { points })
+    } else {
+        let msg = format!("collection {local_storage_name} does not exist");
+        Err(serde_wasm_bindgen::to_value(&msg)?)
+    }
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
