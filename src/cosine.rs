@@ -1,31 +1,32 @@
-/// TODO
-/// something copied from internet:
-/// already regret it since just to make it work properly
-/// I've changed half of the code..
-pub fn distance(vec1: &Vec<f64>, vec2: &Vec<f64>) -> f64 {
-    let dot_product = dot_product(vec1, vec2);
-    let root_sum_square1 = root_sum_square(vec1);
-    let root_sum_square2 = root_sum_square(vec2);
-    return dot_product as f64 / (root_sum_square1 * root_sum_square2);
+pub fn distance(a: &Vec<f64>, b: &Vec<f64>) -> f64 {
+    1.0
 }
 
-fn root_sum_square(vec: &Vec<f64>) -> f64 {
-    let mut sum_square: f64 = 0.0;
-    for i in 0..vec.len() {
-        sum_square += vec[i] * vec[i];
-    }
-    (sum_square as f64).sqrt()
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn dot_product(vec1: &Vec<f64>, vec2: &Vec<f64>) -> f64 {
-    assert!(
-        vec1.len() == vec2.len(),
-        "vectors must have the same length"
-    );
+    #[test]
+    pub fn test_distance() {
+        let v = [
+            [6.6, 6.2, 1.0],
+            [9.7, 9.9, 2.0],
+            [8.0, 8.3, 2.0],
+            [6.3, 5.4, 1.0],
+            [1.3, 2.7, 0.0],
+            [2.3, 3.1, 0.0],
+            [6.6, 6.0, 1.0],
+            [6.5, 6.4, 1.0],
+            [6.3, 5.8, 1.0],
+            [9.5, 9.9, 2.0],
+            [8.9, 8.9, 2.0],
+            [8.7, 9.5, 2.0],
+            [2.5, 3.8, 0.0],
+            [2.0, 3.1, 0.0],
+            [1.3, 1.3, 0.0],
+        ];
 
-    let mut dot_product: f64 = 0.0;
-    for i in 0..vec1.len() {
-        dot_product += vec1[i] * vec2[i];
+        let r = distance(&v[0].to_vec(), &v[14].to_vec());
+        assert_eq!(r, 0.999512076087);
     }
-    dot_product
 }
