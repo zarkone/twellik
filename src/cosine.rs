@@ -1,5 +1,23 @@
+fn dot_product_acc(acc: f64, (a, b): (&f64, &f64)) -> f64 {
+    acc + a * b
+}
+
+fn dot_product(a: &Vec<f64>, b: &Vec<f64>) -> f64 {
+    a.iter().zip(b.iter()).fold(0.0, dot_product_acc)
+}
+
 pub fn distance(a: &Vec<f64>, b: &Vec<f64>) -> f64 {
-    1.0
+    assert!(
+        a.len() == b.len(),
+        "cosine distance: vectors must have the same lenght"
+    );
+
+    let product = dot_product(&a, &b);
+
+    let norm_a = dot_product(&a, &a).sqrt();
+    let norm_b = dot_product(&b, &b).sqrt();
+
+    product / (norm_a * norm_b)
 }
 
 #[cfg(test)]
@@ -26,7 +44,17 @@ mod tests {
             [1.3, 1.3, 0.0],
         ];
 
-        let r = distance(&v[0].to_vec(), &v[14].to_vec());
-        assert_eq!(r, 0.999512076087);
+        let r1 = distance(&v[14].to_vec(), &v[0].to_vec());
+        assert_eq!(r1, 0.993472672904106);
+
+        let r2 = distance(&v[14].to_vec(), &v[1].to_vec());
+        assert_eq!(r2, 0.9896970521184516);
+
+        let r3 = distance(&v[14].to_vec(), &v[4].to_vec());
+        assert_eq!(r3, 0.9438583563660174);
+
+        let v2 = [[6.6, 6.2], [9.7, 9.9]];
+        let r4 = distance(&v2[0].to_vec(), &v2[1].to_vec());
+        assert_eq!(r4, 0.9991413385403556);
     }
 }
