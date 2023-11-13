@@ -9,6 +9,7 @@ use serde_wasm_bindgen;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Point {
+    /// TODO: id should be uuid or any
     id: String,
     vector: Vec<f64>,
     payload: HashMap<String, String>,
