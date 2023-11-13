@@ -1,0 +1,25 @@
+* what is faiss?
+
+looks like it is some sort of in-mem db plus vector operations
+
+* trasnformer: model
+https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)
+#+begin_quote
+A transformer is a deep learning architecture, initially proposed in
+2017, that relies on the parallel multi-head attention mechanism.[1]
+It is notable for requiring less training time than previous recurrent
+neural architectures, such as long short-term memory (LSTM),[2] and
+its later variation has been prevalently adopted for training large
+language models on large (language) datasets, such as the Wikipedia
+corpus and Common Crawl, by virtue of the parallelized processing of
+input sequence.[3]
+#+end_quote
+
+#+begin_quote
+The transformer has had great success in natural language processing
+(NLP), for example the tasks of machine translation and time series
+prediction. Many large language models such as GPT-2, GPT-3, GPT-4,
+Claude, BERT, XLNet, RoBERTa and ChatGPT demonstrate the ability of
+transformers to perform a wide variety of such NLP-related tasks, and
+have the potential to find real-world applications.
+#+end_quote

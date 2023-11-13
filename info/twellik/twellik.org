@@ -1,0 +1,181 @@
+* [#A] Distance between vectors is off                         :twellik_demo:
+
+1. find reliable place to check
+2. compare results
+
+*** cosine vs euclidean
+
+while looking for test data, I came across this article:
+[[https://cmry.github.io/notes/euclidean-v-cosine][Euclidean vs. Cosine Distance]]
+
+it has some data but also an explanation about the topic. Or, at
+least, about an interesting difference between cosine and Euclidean:
+
+#+begin_quote
+While cosine looks at the angle between vectors (thus not taking into
+regard their weight or magnitude), euclidean distance is similar to
+using a ruler to actually measure the distance. In our example the
+angle between x14 and x4 was larger than those of the other vectors,
+even though they were further away.
+#+end_quote
+
+*** clip to pinecone
+
+maybe the way how I transform tensor to embeds is wrong?
+this artical from pinecone should show how to transfrom model results
+into vector db suitable vectors properly:
+
+https://www.pinecone.io/learn/clip-image-search/
+
+* [#A] Hierarchical Navigable Small Worlds (HNSW)
+
+links:
+[[https://www.pinecone.io/learn/series/faiss/hnsw/][Pinecone: HNSW]]
+
+* [#A] Add support for distance formulas
+
+Curently, we have only poor implementation of cosine -- which might
+not work properly even. There should be a way to define a distance
+metric when defining index.
+
+** DONE cosine
+CLOSED: [2023-11-11 Sat 02:15]
+cosine similarity vs. cosine distance:
+dis = 1 - sim
+
+** dotproduct
+** euclid
+
+* [#A] Work in mem, serilize to store
+or, rather, proper serialization strategy, -- at least so that each
+query doesn't read whole db each time 😄
+
+* [#C] LocalStorage vs. IndexDB
+
+IndexDB has a binary storage, which might be an advantage. From the
+other hand, it doesn't make sense to create overhead for db by using
+another db.. storage should be simple and portable, this way it would
+be easier to port Twellek from browser to WASI and other runtimes.
+
+* [#C] WebGPU and vector instructions
+There's definitely a way to use webgpu in WASM, the question is how to
+use GPU.
+
+Second question is is there a way to use CPU vector extensions from
+WASM, in browser in particular
+
+**  vector instructions
+
+*** what we can do with vector instructions, what types do we have :question:
+
+SIMD
+
+[[https://gist.github.com/kbarbary/9efb3650f1b69b2b6b18e34ad347777b][Vector-matrix-vector multiplication with SIMD (AVX) intrinsics]]
+
+https://www.cs.brandeis.edu/~cs146a/rust/rustbyexample-02-21-2015/simd.html
+#+begin_src rust
+fn simd_add_assign(xs: &mut Vec<f32>, ys: &Vec<f32>) {
+    assert_equal_len!(xs, ys);
+
+    let size = xs.len() as isize;
+    let chunks = size / 4;
+
+    // pointer to the start of the vector data
+    let p_x: *mut f32 = xs.as_mut_ptr();
+    let p_y: *const f32 = ys.as_ptr();
+
+    // sum excess elements that don't fit in the simd vector
+    for i in (4 * chunks)..size {
+        // dereferencing a raw pointer requires an unsafe block
+        unsafe {
+            // offset by i elements
+            *p_x.offset(i) += *p_y.offset(i);
+        }
+    }
+
+    // treat f32 vector as an simd f32x4 vector
+    let simd_p_x = p_x as *mut f32x4;
+    let simd_p_y = p_y as *const f32x4;
+
+    // sum "simd vector"
+    for i in 0..chunks {
+        unsafe {
+            *simd_p_x.offset(i) += *simd_p_y.offset(i);
+        }
+    }
+}
+#+end_src
+
+https://github.com/doxakis/CosineSimilarityComparison
+#+begin_quote
+There is a minimal cost to communicate with the GPU device (about 300
+ms in the experimentation and only occur on the first GPU call). You
+need to have a great amount of data to use the GPU. Otherwise, it's
+slower than the single thread version. The communication cost with GPU
+is negligible when using large arrays. If the array is too large, we
+got an exception. (Maybe it's time to do batch processing and do
+multiple GPU call.)
+
+The Advanced Vector Extensions of modern CPU can be used per
+thread. Adding more threads reduce the computation time. Compared to
+the simple method, it uses about half (or less) the time to do the
+same job in the integer version. If the dataset is a double array, the
+performance is the same or worst.
+
+Obviously, using double is way slower than integer. If possible,
+always prefer integer. If you want to keep some digits, you could
+multiple the number by 10 or 100 and convert it to integer. If you
+really want to keep double, maybe you should consider using the GPU.
+
+If we compare the vectorized version (integer array, v1 and v2), the
+dot product is faster than doing an addition/multiplication on an
+accumulator vector and taking the sum of the accumulator when having
+small dimension in the array. (It's slower than the simple method on 1
+thread.) But, if you consider an array with a lot of dimension, it's
+faster using an accumulator vector than using the dot product
+operation.
+#+end_quote
+
+[[https://www.sciencedirect.com/topics/computer-science/vector-instruction][Vector instructions]]
+#+begin_quote
+Vector instructions include instructions that perform floating-point
+operations, instructions that load vector registers from memory and
+store them to memory, instructions to manipulate vector mask
+registers, and other special purpose instructions such as vector
+shuffle.
+
+From: Intel Xeon Phi Coprocessor High Performance Programming, 2013
+#+end_quote
+
+*** what types of vector instructions we have in browser available :question:
+
+https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions
+
+https://doc.rust-lang.org/beta/core/arch/wasm32/index.html#simd
+
+[[https://v8.dev/features/simd]]
+
+* [#C] Qdrant / Pinecone API                                     :adoptation:
+
+In order to increase adoptability, there should be a way to easy move
+your code and data from existing popular vector DBs.
+
+** client / library interface
+** guide how to move data from ... to twellik
+** CSV import / export
+
+* [#A] Unsplash search example                                         :demo:
+
+** Host model for demo queries
+
+* [#B] README, examples, pictures                                      :docs:
+
+* [#C] ideas for demo
+
+* [#A] Query language, simular to qdrant / elastic               :query_lang:
+
+* [#C] SQL                                                       :query_lang:
+
+* [#B] Quantization
+
+* [#B] Hybrid search, vector + metadata
