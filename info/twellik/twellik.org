@@ -27,12 +27,53 @@ into vector db suitable vectors properly:
 
 https://www.pinecone.io/learn/clip-image-search/
 
-* [#A] Hierarchical Navigable Small Worlds (HNSW)
+* [#A] Hierarchical Navigable Small Worlds (HNSW)                      :core:
 
-links:
 [[https://www.pinecone.io/learn/series/faiss/hnsw/][Pinecone: HNSW]]
+[[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using
+Hierarchical Navigable Small World graphs]]
 
-* [#A] Add support for distance formulas
+[[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
+
+** knn
+
+** nsw
+
+** a-knn (approximate knn)
+
+** proximity graphs
+
+** lsh (locally-sensitive hashing)
+
+** product quantization
+
+** probabilistic skip list
+https://en.wikipedia.org/wiki/Skip_list
+
+** greedy algorithm
+
+[[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs]]
+
+[[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
+
+** knn
+
+** nsw
+
+** a-knn (approximate knn)
+
+** proximity graphs
+
+** lsh (locally-sensitive hashing)
+
+** product quantization
+
+** probabilistic skip list
+https://en.wikipedia.org/wiki/Skip_list
+
+** greedy algorithm
+
+* [#A] Add support for distance formulas                               :core:
 
 Curently, we have only poor implementation of cosine -- which might
 not work properly even. There should be a way to define a distance
@@ -46,18 +87,54 @@ dis = 1 - sim
 ** dotproduct
 ** euclid
 
-* [#A] Work in mem, serilize to store
+* [#A] Work in mem, serilize to store                                  :core:
 or, rather, proper serialization strategy, -- at least so that each
 query doesn't read whole db each time 😄
 
-* [#C] LocalStorage vs. IndexDB
+* IN-PROGRESS [#C] LocalStorage vs. IndexDB                            :core:
 
 IndexDB has a binary storage, which might be an advantage. From the
 other hand, it doesn't make sense to create overhead for db by using
 another db.. storage should be simple and portable, this way it would
 be easier to port Twellek from browser to WASI and other runtimes.
 
-* [#C] WebGPU and vector instructions
+[[https://hacks.mozilla.org/2012/02/storing-images-and-files-in-indexeddb/][Mosilla Hacks: Storing images and files in IndexedDB]]
+
+https://web.dev/articles/indexeddb-best-practices
+
+=Blob= is not supported on Safari it seems:
+
+#+begin_quote
+Not everything can be stored in IndexedDB on all platforms
+
+If you are storing large, user-generated files such as images or
+videos, then you may try to store them as File or Blob objects. This
+will work on some platforms but fail on others. Safari on iOS, in
+particular, cannot store Blobs in IndexedDB.
+
+Luckily it is not too difficult to convert a Blob into an ArrayBuffer,
+and vice versa. Storing ArrayBuffers in IndexedDB is very well
+supported.
+
+#+end_quote
+
+** [?] How to pass-through data from e.g. indexdb by ref, to avoid copying?
+
+** [?] How to call js object methods from rust?
+https://github.com/rustwasm/wasm-bindgen
+[[https://rustwasm.github.io/docs/wasm-bindgen/][wasm-bindgen guide]]
+
+import web-sys crate and activate feature flags
+[[https://github.com/rustwasm/wasm-bindgen/blob/9fb3bca16876c756266274f78fcd0214e0581eaa/guide/src/web-sys/index.md?plain=1#L4][web-sys/index.md]]
+https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.IdbRequest.html
+
+* [?] using async in/from WASM
+https://web.dev/articles/asyncify
+https://rustwasm.github.io/wasm-bindgen/api/wasm_bindgen_futures/
+
+
+* [#C] WebGPU and vector instructions                                  :perf:
+
 There's definitely a way to use webgpu in WASM, the question is how to
 use GPU.
 
@@ -155,6 +232,10 @@ https://doc.rust-lang.org/beta/core/arch/wasm32/index.html#simd
 
 [[https://v8.dev/features/simd]]
 
+** WebGPU
+turns out, webgl can be used to search textures!
+https://webgl2fundamentals.org/webgl/lessons/webgl-gpgpu.html
+
 * [#C] Qdrant / Pinecone API                                     :adoptation:
 
 In order to increase adoptability, there should be a way to easy move
@@ -169,13 +250,12 @@ your code and data from existing popular vector DBs.
 ** Host model for demo queries
 
 * [#B] README, examples, pictures                                      :docs:
-
 * [#C] ideas for demo
-
 * [#A] Query language, simular to qdrant / elastic               :query_lang:
-
 * [#C] SQL                                                       :query_lang:
-
 * [#B] Quantization
-
 * [#B] Hybrid search, vector + metadata
+[[https://www.youtube.com/watch?v=taYoJ-mKLUI][YouTube: Natural Language Processing with Qdrant for Vector Similarity
+Search]]
+
+[[https://qdrant.tech/articles/hybrid-search/][On hybrid search (qdrant)]]
