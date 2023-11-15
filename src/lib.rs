@@ -1,4 +1,6 @@
 mod cosine;
+
+mod indexed_db;
 use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
@@ -70,11 +72,9 @@ pub fn create_collection(name: &str) -> Result<(), JsValue> {
     Ok(())
 }
 
-// TODO: how to pass types from/to JS land:
-// https://rustwasm.github.io/wasm-bindgen/reference/arbitrary-data-with-serde.html?highlight=array#javascript-usage
-
 #[wasm_bindgen]
 /// TODO: support async
+/// TODO: upsert erases all points currently
 pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
     // TODO: probably can just passthrough
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;

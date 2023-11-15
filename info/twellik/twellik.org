@@ -91,7 +91,7 @@ dis = 1 - sim
 or, rather, proper serialization strategy, -- at least so that each
 query doesn't read whole db each time 😄
 
-* IN-PROGRESS [#C] LocalStorage vs. IndexDB                            :core:
+* IN-PROGRESS [#C] COMMENT LocalStorage vs. IndexDB                            :core:
 
 IndexDB has a binary storage, which might be an advantage. From the
 other hand, it doesn't make sense to create overhead for db by using
@@ -115,7 +115,17 @@ particular, cannot store Blobs in IndexedDB.
 Luckily it is not too difficult to convert a Blob into an ArrayBuffer,
 and vice versa. Storing ArrayBuffers in IndexedDB is very well
 supported.
+#+end_quote
 
+from [[https://developer.mozilla.org/en-US/docs/Web/API/IDBRequest][MDN: IDBRequest]] on =readyState=:
+#+begin_quote
+All asynchronous operations immediately return an IDBRequest
+instance. Each request has a readyState that is set to the 'pending'
+state; this changes to 'done' when the request is completed or
+fails. When the state is set to done, every request returns a result
+and an error, and an event is fired on the request. When the state is
+still pending, any attempt to access the result or error raises an
+InvalidStateError exception.
 #+end_quote
 
 ** [?] How to pass-through data from e.g. indexdb by ref, to avoid copying?
@@ -128,10 +138,38 @@ import web-sys crate and activate feature flags
 [[https://github.com/rustwasm/wasm-bindgen/blob/9fb3bca16876c756266274f78fcd0214e0581eaa/guide/src/web-sys/index.md?plain=1#L4][web-sys/index.md]]
 https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.IdbRequest.html
 
-* [?] using async in/from WASM
+
+** [?] using async in/from WASM
 https://web.dev/articles/asyncify
 https://rustwasm.github.io/wasm-bindgen/api/wasm_bindgen_futures/
+[[https://users.rust-lang.org/t/can-you-turn-a-callback-into-a-future-into-async-await/49378/8][
+how to impl future (turn cb into future)]]
+[[https://www.reddit.com/r/rust/comments/bpmy21/what_is_the_rust_core_crate/][rust: core vs. std]]
+[[https://rust-lang.github.io/async-book/02_execution/02_future.html][Async programming in Rust: The Future Trait]]
 
+Why does passing a closure to function which accepts a function
+pointer not work?
+
+https://stackoverflow.com/questions/52696907/why-does-passing-a-closure-to-function-which-accepts-a-function-pointer-not-work
+
+
+[[https://github.com/rustwasm/wasm-bindgen/issues/1126][#1126 Execute futures in WASM]]
+
+
+
+* [?] Consider js/ts wrapper
+After I've spent some time with web_sys and indexed_db, I found it
+pretty hard to make a wrappre for indexed db inside of WASM.
+
+The idea was to convert indexed_db =open= to future which waits for
+=readyState= of indexed_db -- to make it a little bit more elegant.
+
+It seems I see the light in the end of this rabbit hole, however, it
+feels too tricky for a simple db_open operation.
+
+Mabe I should better make a small wrapper which opens db in JS and
+passes it into WASM after? So that Rust assumes that it is ready and
+successfully opened, to avoid all this hustle.
 
 * [#C] WebGPU and vector instructions                                  :perf:
 
