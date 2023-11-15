@@ -1,93 +1,44 @@
 use crate::log;
-use core::future::Future;
-use core::pin::Pin;
-use core::task;
-use core::task::Poll;
-use js_sys::Function;
+use indexed_db_futures::prelude::*;
 use thiserror::Error;
-use wasm_bindgen::prelude::{Closure, JsCast};
-use web_sys::IdbOpenDbRequest;
-use web_sys::IdbRequestReadyState;
+use wasm_bindgen::JsValue;
+use web_sys::DomException;
 
 #[derive(Debug, Error)]
 pub enum IdbError {
     #[error("can't opend indexed db: {0}")]
     IdbOpenError(String),
 
-    #[error("IdbFactory error: {0}")]
-    IdbFactoryError(String),
-
     #[error("can't WASM env error: {0}")]
     EnvError(String),
 }
-
-pub struct IndexedDB<'a> {
-    pub name: &'a str,
-    open_db_request: IdbOpenDbRequest,
-}
-
-impl IndexedDB<'_> {
-    pub fn new(name: &str, open_db_request: IdbOpenDbRequest) -> IndexedDB {
-        IndexedDB {
-            name,
-            open_db_request,
-        }
-    }
-}
-
-impl<'a> Future for IndexedDB<'a> {
-    type Output = IdbRequestReadyState;
-    fn poll(self: Pin<&mut Self>, ctx: &mut task::Context) -> task::Poll<Self::Output> {
-        match self.open_db_request.ready_state() {
-            IdbRequestReadyState::Pending => {
-                let waker = ctx.waker();
-
-                let cb = Closure::<dyn Fn()>::new(move || {
-                    waker.wake();
-                });
-
-                let r = match JsCast::dyn_ref::<Function>(cb.as_ref()) {
-                    Some(f) => f,
-                    None => {
-                        log::log("[indexed_db::poll] can't cast cb ");
-                        return Poll::Ready(IdbRequestReadyState::Done);
-                    }
-                };
-
-                self.open_db_request.set_onsuccess(Some(r));
-
-                Poll::Pending
-            }
-            IdbRequestReadyState::Done => Poll::Ready(IdbRequestReadyState::Done),
-        }
+impl From<DomException> for IdbError {
+    fn from(value: DomException) -> Self {
+        IdbError::IdbOpenError(value.as_string().unwrap_or("".into()))
     }
 }
 async fn open_db(name: &str) -> Result<(), IdbError> {
-    let window = match web_sys::window() {
-        Some(w) => w,
-        None => {
-            let msg = "Window is null";
-            return Err(IdbError::EnvError(msg.into()));
+    let mut db_req: OpenDbRequest = IdbDatabase::open_u32(name, 1)?;
+    db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
+        // Check if the object store exists; create it if it doesn't
+        if let None = evt.db().object_store_names().find(|n| n == "my_store") {
+            evt.db().create_object_store("my_store")?;
         }
-    };
+        Ok(())
+    }));
 
-    let idb_factory = match window.indexed_db() {
-        Ok(f_res) => match f_res {
-            Some(f) => f,
-            None => {
-                let msg = "window.indexed_db is null";
-                return Err(IdbError::EnvError(msg.into()));
-            }
-        },
-        Err(e) => {
-            let msg = e
-                .as_string()
-                .expect("cannot get IdbFactory from environment");
-            return Err(IdbError::IdbFactoryError(msg));
-        }
-    };
+    let db: IdbDatabase = db_req.await?;
 
-    let _idb_open_request = idb_factory.open(name);
+    // Insert/overwrite a record
+    let tx: IdbTransaction =
+        db.transaction_on_one_with_mode("my_store", IdbTransactionMode::Readwrite)?;
+    let store: IdbObjectStore = tx.object_store("my_store")?;
 
+    let value_to_put: JsValue = JsValue::from_str("hello");
+    store.put_key_val_owned("my_key", &value_to_put)?;
+
+    // IDBTransactions can have an Error or an Abort event; into_result() turns both into a
+    // DOMException
+    tx.await.into_result()?;
     Ok(())
 }
