@@ -17,7 +17,7 @@ impl From<DomException> for IdbError {
         IdbError::IdbOpenError(value.as_string().unwrap_or("".into()))
     }
 }
-async fn open_db(name: &str) -> Result<(), IdbError> {
+pub async fn open_db(name: &str) -> Result<(), IdbError> {
     let mut db_req: OpenDbRequest = IdbDatabase::open_u32(name, 1)?;
     db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
         // Check if the object store exists; create it if it doesn't

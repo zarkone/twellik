@@ -60,7 +60,11 @@ fn make_local_storage_collection_name(name: &str) -> String {
 }
 
 #[wasm_bindgen]
-pub fn create_collection(name: &str) -> Result<(), JsValue> {
+pub async fn create_collection(name: &str) -> Result<(), JsValue> {
+    match indexed_db::open_db("hello").await {
+        Ok(_) => twellik_log("opened hello db"),
+        Err(e) => return Err(e.to_string().into()),
+    };
     let local_storage_name = make_local_storage_collection_name(&name);
     if let Some(_) = local_storage_get_item(&local_storage_name) {
         twellik_log(
