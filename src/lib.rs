@@ -1,6 +1,7 @@
 mod cosine;
-
 mod indexed_db;
+mod log;
+
 use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;

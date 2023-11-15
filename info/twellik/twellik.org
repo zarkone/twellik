@@ -154,6 +154,11 @@ https://stackoverflow.com/questions/52696907/why-does-passing-a-closure-to-funct
 
 
 [[https://github.com/rustwasm/wasm-bindgen/issues/1126][#1126 Execute futures in WASM]]
+... and here is exactly what I'm doing:
+https://github.com/rustwasm/wasm-bindgen/issues/1126#issuecomment-451769937
+
+... and here is a crate..!
+https://github.com/Alorel/rust-indexed-db
 
 
 

@@ -1,8 +1,11 @@
+use crate::log;
 use core::future::Future;
 use core::pin::Pin;
 use core::task;
 use core::task::Poll;
+use js_sys::Function;
 use thiserror::Error;
+use wasm_bindgen::prelude::{Closure, JsCast};
 use web_sys::IdbOpenDbRequest;
 use web_sys::IdbRequestReadyState;
 
@@ -33,19 +36,29 @@ impl IndexedDB<'_> {
 }
 
 impl<'a> Future for IndexedDB<'a> {
-    type Output = IndexedDB<'a>;
+    type Output = IdbRequestReadyState;
     fn poll(self: Pin<&mut Self>, ctx: &mut task::Context) -> task::Poll<Self::Output> {
         match self.open_db_request.ready_state() {
             IdbRequestReadyState::Pending => {
                 let waker = ctx.waker();
 
-                self.open_db_request.set_onsuccess(Some(|_e| {
+                let cb = Closure::<dyn Fn()>::new(move || {
                     waker.wake();
-                }));
+                });
+
+                let r = match JsCast::dyn_ref::<Function>(cb.as_ref()) {
+                    Some(f) => f,
+                    None => {
+                        log::log("[indexed_db::poll] can't cast cb ");
+                        return Poll::Ready(IdbRequestReadyState::Done);
+                    }
+                };
+
+                self.open_db_request.set_onsuccess(Some(r));
 
                 Poll::Pending
             }
-            IdbRequestReadyState::Done => Poll::Ready(self),
+            IdbRequestReadyState::Done => Poll::Ready(IdbRequestReadyState::Done),
         }
     }
 }
@@ -74,7 +87,7 @@ async fn open_db(name: &str) -> Result<(), IdbError> {
         }
     };
 
-    let idb_open_request = idb_factory.open(name);
+    let _idb_open_request = idb_factory.open(name);
 
     Ok(())
 }
