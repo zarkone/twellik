@@ -61,6 +61,7 @@ fn make_local_storage_collection_name(name: &str) -> String {
 
 #[wasm_bindgen]
 pub async fn create_collection(name: &str) -> Result<(), JsValue> {
+    twellik_log("HAVE YOU REBUILT WASM?");
     match indexed_db::open_db("hello").await {
         Ok(_) => twellik_log("opened hello db"),
         Err(e) => return Err(e.to_string().into()),
