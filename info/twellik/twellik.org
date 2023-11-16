@@ -129,6 +129,9 @@ InvalidStateError exception.
 #+end_quote
 
 ** [?] How to pass-through data from e.g. indexdb by ref, to avoid copying?
+It could be not possible, however, we might at least avoid copying on
+js<->rust format serialization using [[https://rkyv.org/][rkyv]] in combination with array
+buffer / blob
 
 ** [?] How to call js object methods from rust?
 https://github.com/rustwasm/wasm-bindgen

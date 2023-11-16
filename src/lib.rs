@@ -6,11 +6,23 @@ use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
-use serde::{Deserialize, Serialize};
+use rkyv;
+use rkyv::AlignedVec;
+use rkyv::Deserialize;
+use serde;
 use serde_json;
 use serde_wasm_bindgen;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    serde::Serialize,
+    serde::Deserialize,
+    Debug,
+    Clone,
+)]
+#[archive(check_bytes)]
 struct Point {
     /// TODO: id should be uuid or any
     id: String,
@@ -18,19 +30,19 @@ struct Point {
     payload: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct Collection {
     pub points: Vec<Point>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct Query {
     vector: Vec<f64>,
     payload: HashMap<String, String>,
     k: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct QueryResult {
     point: Point,
     distance: f64,
@@ -62,10 +74,6 @@ fn make_local_storage_collection_name(name: &str) -> String {
 #[wasm_bindgen]
 pub async fn create_collection(name: &str) -> Result<(), JsValue> {
     twellik_log("HAVE YOU REBUILT WASM?");
-    match indexed_db::open_db("hello").await {
-        Ok(_) => twellik_log("opened hello db"),
-        Err(e) => return Err(e.to_string().into()),
-    };
     let local_storage_name = make_local_storage_collection_name(&name);
     if let Some(_) = local_storage_get_item(&local_storage_name) {
         twellik_log(
@@ -81,9 +89,28 @@ pub async fn create_collection(name: &str) -> Result<(), JsValue> {
 #[wasm_bindgen]
 /// TODO: support async
 /// TODO: upsert erases all points currently
-pub fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
+/// TODO: if it is async, js should use await, right?
+pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
+    // todo: indexed-db
+    // convert vectors to arraybuffer
+    // figure format, how we store the data
+    // write as (one?)binary blob, -- use indexed-db asr kv storage
+
+    // todo
+    // how and when we serilize to db?
+
+    match indexed_db::open_db(coll_name).await {
+        Ok(_) => twellik_log(format!("Opened db {coll_name}").as_str()),
+        Err(e) => return Err(e.to_string().into()),
+    };
+
     // TODO: probably can just passthrough
+    // TODO: should be async/nonblocking/point-by-point?
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
+    let b_points = rkyv::to_bytes::<_, 256>(&rs_points).unwrap();
+    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&b_points[..]).unwrap();
+    let rs_points2: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+
     let js_points = match serde_json::to_string(&rs_points) {
         Ok(p) => p,
         Err(e) => e.to_string(),
