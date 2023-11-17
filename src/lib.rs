@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use rkyv;
-use rkyv::AlignedVec;
 use rkyv::Deserialize;
 use serde;
 use serde_json;
@@ -91,26 +90,37 @@ pub async fn create_collection(name: &str) -> Result<(), JsValue> {
 /// TODO: upsert erases all points currently
 /// TODO: if it is async, js should use await, right?
 pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
-    // todo: indexed-db
-    // convert vectors to arraybuffer
-    // figure format, how we store the data
-    // write as (one?)binary blob, -- use indexed-db asr kv storage
-
-    // todo
-    // how and when we serilize to db?
-
-    match indexed_db::open_db(coll_name).await {
-        Ok(_) => twellik_log(format!("Opened db {coll_name}").as_str()),
+    let db = match indexed_db::open_db(coll_name).await {
+        Ok(db) => {
+            twellik_log(format!("Opened db {coll_name}").as_str());
+            db
+        }
         Err(e) => return Err(e.to_string().into()),
     };
 
-    // TODO: probably can just passthrough
     // TODO: should be async/nonblocking/point-by-point?
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
-    let b_points = rkyv::to_bytes::<_, 256>(&rs_points).unwrap();
-    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&b_points[..]).unwrap();
-    let rs_points2: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
 
+    let b_points = rkyv::to_bytes::<_, 256>(&rs_points).unwrap();
+    // let archived_points = rkyv::check_archived_root::<Vec<Point>>(&b_points[..]).unwrap();
+    //let rs_points2: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+    let b_points_u8 = b_points.as_slice();
+    let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
+
+    match indexed_db::put_key_val(&db, coll_name, &b_points_jsval).await {
+        Ok(_) => {
+            twellik_log(format!("Added points to {coll_name}.").as_str());
+        }
+        Err(e) => {
+            twellik_log(
+                format!("Error inserting points to {coll_name}: {}", e.to_string()).as_str(),
+            );
+        }
+    };
+    // TODO: AlignedVec to JsArrayBuffer?
+    // https://docs.rs/js-sys/latest/js_sys/struct.SharedArrayBuffer.html
+    //
+    ////// local-storage part here, remove
     let js_points = match serde_json::to_string(&rs_points) {
         Ok(p) => p,
         Err(e) => e.to_string(),

@@ -17,25 +17,36 @@ impl From<DomException> for IdbError {
         IdbError::IdbOpenError(value.as_string().unwrap_or("".into()))
     }
 }
-pub async fn open_db(name: &str) -> Result<(), IdbError> {
-    let mut db_req: OpenDbRequest = IdbDatabase::open_u32(name, 1)?;
-    db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
-        // Check if the object store exists; create it if it doesn't
-        if let None = evt.db().object_store_names().find(|n| n == "my_store") {
-            evt.db().create_object_store("my_store")?;
-        }
-        Ok(())
-    }));
+
+pub async fn open_db(name: &str) -> Result<IdbDatabase, IdbError> {
+    let mut db_req: OpenDbRequest = IdbDatabase::open_u32("_twellik", 1)?;
+    let cloned_name = name.to_string();
+    db_req.set_on_upgrade_needed(Some(
+        move |evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
+            // Check if the object store exists; create it if it doesn't
+            if let None = evt.db().object_store_names().find(|n| n == &cloned_name) {
+                evt.db().create_object_store(&cloned_name)?;
+            }
+            Ok(())
+        },
+    ));
 
     let db: IdbDatabase = db_req.await?;
 
+    Ok(db)
+}
+
+pub async fn put_key_val(
+    db: &IdbDatabase,
+    coll_name: &str,
+    value: &JsValue,
+) -> Result<(), IdbError> {
     // Insert/overwrite a record
     let tx: IdbTransaction =
-        db.transaction_on_one_with_mode("my_store", IdbTransactionMode::Readwrite)?;
-    let store: IdbObjectStore = tx.object_store("my_store")?;
+        db.transaction_on_one_with_mode(coll_name, IdbTransactionMode::Readwrite)?;
+    let store: IdbObjectStore = tx.object_store(coll_name)?;
 
-    let value_to_put: JsValue = JsValue::from_str("hello");
-    store.put_key_val_owned("my_key", &value_to_put)?;
+    store.put_key_val_owned(coll_name, value)?;
 
     // IDBTransactions can have an Error or an Abort event; into_result() turns both into a
     // DOMException
