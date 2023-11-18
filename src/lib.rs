@@ -7,9 +7,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use rkyv;
-use rkyv::Deserialize;
 use serde;
-use serde_json;
 use serde_wasm_bindgen;
 
 #[derive(
@@ -49,25 +47,12 @@ struct QueryResult {
 
 #[wasm_bindgen]
 extern "C" {
-    pub fn alert(s: &str);
-
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log(s: &str);
-
-    #[wasm_bindgen(js_namespace = localStorage, js_name = setItem)]
-    fn local_storage_set_item(key: &str, val: &str);
-
-    #[wasm_bindgen(js_namespace = localStorage, js_name = getItem)]
-    fn local_storage_get_item(key: &str) -> Option<String>;
-
 }
 
 fn twellik_log(s: &str) {
     log(format!("Twellik: {s}").as_str())
-}
-fn make_local_storage_collection_name(name: &str) -> String {
-    let prefix = "__twellik";
-    format!("{prefix}_{name}")
 }
 
 #[wasm_bindgen]
@@ -98,6 +83,8 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
 
     let b_points = rkyv::to_bytes::<_, 256>(&rs_points).unwrap();
+
+    // TODO: check unpacked binary
     // let archived_points = rkyv::check_archived_root::<Vec<Point>>(&b_points[..]).unwrap();
     //let rs_points2: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
     let b_points_u8 = b_points.as_slice();
