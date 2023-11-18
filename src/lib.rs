@@ -71,17 +71,13 @@ fn make_local_storage_collection_name(name: &str) -> String {
 }
 
 #[wasm_bindgen]
+/// create_collection is currently useless, however,
+/// we will probably need it in future when we need to set params
+/// before inserting items
 pub async fn create_collection(name: &str) -> Result<(), JsValue> {
     twellik_log("HAVE YOU REBUILT WASM?");
-    let local_storage_name = make_local_storage_collection_name(&name);
-    if let Some(_) = local_storage_get_item(&local_storage_name) {
-        twellik_log(
-            format!("{local_storage_name} collection exist, sipping collection creation.").as_str(),
-        );
-    } else {
-        local_storage_set_item(&local_storage_name, &"");
-        twellik_log(format!("{local_storage_name} collection created.").as_str());
-    }
+    twellik_log(format!("{name} collection creation invoked.").as_str());
+
     Ok(())
 }
 
@@ -107,7 +103,7 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
     let b_points_u8 = b_points.as_slice();
     let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
 
-    match indexed_db::put_key_val(&db, coll_name, &b_points_jsval).await {
+    match indexed_db::put_key(&db, coll_name, &b_points_jsval).await {
         Ok(_) => {
             twellik_log(format!("Added points to {coll_name}.").as_str());
         }
@@ -117,18 +113,6 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
             );
         }
     };
-    // TODO: AlignedVec to JsArrayBuffer?
-    // https://docs.rs/js-sys/latest/js_sys/struct.SharedArrayBuffer.html
-    //
-    ////// local-storage part here, remove
-    let js_points = match serde_json::to_string(&rs_points) {
-        Ok(p) => p,
-        Err(e) => e.to_string(),
-    };
-    let local_storage_name = make_local_storage_collection_name(&coll_name);
-
-    twellik_log(format!("upserting points in {local_storage_name}: {:?}", &rs_points).as_str());
-    local_storage_set_item(&local_storage_name, &js_points);
 
     Ok(())
 }

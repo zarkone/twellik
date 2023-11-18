@@ -36,20 +36,12 @@ pub async fn open_db(name: &str) -> Result<IdbDatabase, IdbError> {
     Ok(db)
 }
 
-pub async fn put_key_val(
-    db: &IdbDatabase,
-    coll_name: &str,
-    value: &JsValue,
-) -> Result<(), IdbError> {
-    // Insert/overwrite a record
-    let tx: IdbTransaction =
-        db.transaction_on_one_with_mode(coll_name, IdbTransactionMode::Readwrite)?;
-    let store: IdbObjectStore = tx.object_store(coll_name)?;
+pub async fn put_key(db: &IdbDatabase, key: &str, value: &JsValue) -> Result<(), IdbError> {
+    let tx: IdbTransaction = db.transaction_on_one_with_mode(key, IdbTransactionMode::Readwrite)?;
+    let store: IdbObjectStore = tx.object_store(key)?;
 
-    store.put_key_val_owned(coll_name, value)?;
-
-    // IDBTransactions can have an Error or an Abort event; into_result() turns both into a
-    // DOMException
+    store.put_key_val_owned(key, value)?;
     tx.await.into_result()?;
+
     Ok(())
 }
