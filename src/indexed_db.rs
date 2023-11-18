@@ -50,7 +50,7 @@ pub async fn get_key(db: &IdbDatabase, key: &str) -> Result<Option<JsValue>, Idb
     let tx: IdbTransaction = db.transaction_on_one_with_mode(key, IdbTransactionMode::Readonly)?;
     let store: IdbObjectStore = tx.object_store(key)?;
 
-    let value: Option<JsValue> = store.get_owned("my_key")?.await?;
+    let value: Option<JsValue> = store.get_owned(key)?.await?;
 
     Ok(value)
 }

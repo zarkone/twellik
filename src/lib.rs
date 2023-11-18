@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use rkyv;
+use rkyv::Deserialize;
 use serde;
 use serde_wasm_bindgen;
 
@@ -134,8 +135,10 @@ async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
     };
 
     // TODO: should be async/nonblocking/point-by-point?
-    let points: Vec<Point> = serde_wasm_bindgen::from_value(js_points)?;
+    let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
 
+    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
+    let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
     Ok(Collection { points })
 }
 
