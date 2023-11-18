@@ -1,2 +1,2 @@
 build:
-	wasm-pack build --target web
+	wasm-pack build --dev --no-typescript --target web

@@ -58,9 +58,12 @@ struct QueryResult {
 extern "C" {
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log(s: &str);
-
     #[wasm_bindgen(js_namespace = console, js_name = error)]
     fn log_error(s: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = warn)]
+    fn log_warn(s: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = debug)]
+    fn log_debug(s: &str);
 }
 
 fn twellik_log(s: &str) {
@@ -71,13 +74,20 @@ fn twellik_error(s: &str) {
     log_error(format!("Twellik Error: {s}").as_str())
 }
 
+fn twellik_warn(s: &str) {
+    log_warn(format!("Twellik Warn: {s}").as_str())
+}
+fn twellik_debug(s: &str) {
+    log_debug(format!("Twellik Debug: {s}").as_str())
+}
+
 #[wasm_bindgen]
 /// create_collection is currently useless, however,
 /// we will probably need it in future when we need to set params
 /// before inserting items
 pub async fn create_collection(name: &str) -> Result<(), JsValue> {
-    twellik_log("HAVE YOU REBUILT WASM?");
-    twellik_log(format!("{name} collection creation invoked.").as_str());
+    twellik_warn("HAVE YOU REBUILT WASM?");
+    twellik_debug(format!("{name} collection creation invoked.").as_str());
 
     Ok(())
 }
@@ -89,7 +99,7 @@ pub async fn create_collection(name: &str) -> Result<(), JsValue> {
 pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
     let db = match indexed_db::open_db(coll_name).await {
         Ok(db) => {
-            twellik_log(format!("Opened db {coll_name}").as_str());
+            twellik_debug(format!("Opened db {coll_name}").as_str());
             db
         }
         Err(e) => return Err(e.to_string().into()),
@@ -117,10 +127,10 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
 
     match indexed_db::put_key(&db, coll_name, &b_points_jsval).await {
         Ok(_) => {
-            twellik_log(format!("Added points to {coll_name}.").as_str());
+            twellik_debug(format!("Added points to {coll_name}.").as_str());
         }
         Err(e) => {
-            twellik_log(
+            twellik_error(
                 format!("Error inserting points to {coll_name}: {}", e.to_string()).as_str(),
             );
         }
@@ -135,7 +145,7 @@ async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
     if mem_db.is_empty() {
         let db = match indexed_db::open_db(coll_name).await {
             Ok(db) => {
-                twellik_log(format!("Opened db {coll_name}").as_str());
+                twellik_debug(format!("Opened db {coll_name}").as_str());
                 db
             }
             Err(e) => return Err(e.to_string().into()),
@@ -158,9 +168,11 @@ async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
 
         let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
         let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+
         Ok(Collection { points })
     } else {
-        twellik_log("skipping db read, return collection from mem");
+        twellik_debug("skipping db read, return collection from mem");
+
         Ok(Collection {
             // here we clone a collection, so no point of keeping points in mem ATM actually
             // however, it should be fixed when we move to keeping Collection
@@ -195,13 +207,9 @@ fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, 
 /// which match the query
 /// TODO: support async
 pub async fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
-    twellik_log("start parsing.");
-
     let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
-    twellik_log(format!("query: {:?}", &parsed_query).as_str());
 
     let coll = read_collection(coll_name).await?;
-    twellik_log(format!("coll: {:?}", &coll).as_str());
 
     let mut matched_points: Vec<QueryResult> = coll
         .points
@@ -229,7 +237,7 @@ pub async fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, J
 
     let matched_points: Vec<&QueryResult> = matched_points.iter().take(parsed_query.k).collect();
 
-    twellik_log(format!("matched: {:?}", &matched_points).as_str());
+    twellik_debug(format!("matched: {}", &matched_points.len()).as_str());
 
     Ok(serde_wasm_bindgen::to_value(&matched_points)?)
 }

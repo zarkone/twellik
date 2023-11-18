@@ -30,7 +30,6 @@
           resultDiv.id = "result"
           document.body.appendChild(resultDiv)
 
-          console.log(resultDiv)
           points.forEach( point => {
 
               /// TODO workaround for hashmap: cast to regular js object
@@ -40,7 +39,7 @@
               } else {
                   animalFile = point.payload.animal
               }
-              console.log()
+
               const img = document.createElement("img")
               img.src = `/img/${animalFile}`
               img.width = 200
