@@ -118,25 +118,30 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
 }
 
 /// Reads collection into memory.
-fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
-    let local_storage_name = make_local_storage_collection_name(&coll_name);
+async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
+    let db = match indexed_db::open_db(coll_name).await {
+        Ok(db) => {
+            twellik_log(format!("Opened db {coll_name}").as_str());
+            db
+        }
+        Err(e) => return Err(e.to_string().into()),
+    };
 
-    if let Some(js_points) = local_storage_get_item(&local_storage_name) {
-        twellik_log(format!("{:?}", js_points).as_str());
-
-        let points = match serde_json::from_str(&js_points) {
-            Ok(p) => p,
-            Err(e) => {
-                let msg = e.to_string();
-                return Err(serde_wasm_bindgen::to_value(&msg)?);
+    let js_points = match indexed_db::get_key(&db, coll_name).await {
+        Ok(v) => match v {
+            Some(p) => p,
+            None => {
+                twellik_log(format!("Collecton {coll_name} is empty.").as_str());
+                return Err(JsValue::NULL);
             }
-        };
+        },
+        Err(e) => return Err(e.to_string().into()),
+    };
 
-        Ok(Collection { points })
-    } else {
-        let msg = format!("collection {local_storage_name} does not exist");
-        Err(serde_wasm_bindgen::to_value(&msg)?)
-    }
+    // TODO: should be async/nonblocking/point-by-point?
+    let points: Vec<Point> = serde_wasm_bindgen::from_value(js_points)?;
+
+    Ok(Collection { points })
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
@@ -164,13 +169,13 @@ fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, 
 /// Searches through points and returns K amount of closest points
 /// which match the query
 /// TODO: support async
-pub fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
+pub async fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
     twellik_log("start parsing.");
 
     let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
     twellik_log(format!("query: {:?}", &parsed_query).as_str());
 
-    let coll = read_collection(coll_name)?;
+    let coll = read_collection(coll_name).await?;
     twellik_log(format!("coll: {:?}", &coll).as_str());
 
     let mut matched_points: Vec<QueryResult> = coll
