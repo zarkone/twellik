@@ -49,10 +49,17 @@ struct QueryResult {
 extern "C" {
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log(s: &str);
+
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn log_error(s: &str);
 }
 
 fn twellik_log(s: &str) {
     log(format!("Twellik: {s}").as_str())
+}
+
+fn twellik_error(s: &str) {
+    log_error(format!("Twellik Error: {s}").as_str())
 }
 
 #[wasm_bindgen]
@@ -118,8 +125,9 @@ async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
         Ok(v) => match v {
             Some(p) => p,
             None => {
-                twellik_log(format!("Collecton {coll_name} is empty.").as_str());
-                return Err(JsValue::NULL);
+                let msg = format!("Collecton {coll_name} is empty.");
+                twellik_error(&msg);
+                return Err(JsValue::from_str(&msg));
             }
         },
         Err(e) => return Err(e.to_string().into()),
