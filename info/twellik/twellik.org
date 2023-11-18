@@ -27,7 +27,7 @@ into vector db suitable vectors properly:
 
 https://www.pinecone.io/learn/clip-image-search/
 
-* [#A] Hierarchical Navigable Small Worlds (HNSW)                      :core:
+* TODO [#A] Hierarchical Navigable Small Worlds (HNSW)                 :core:
 
 [[https://www.pinecone.io/learn/series/faiss/hnsw/][Pinecone: HNSW]]
 [[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using
@@ -84,14 +84,17 @@ CLOSED: [2023-11-11 Sat 02:15]
 cosine similarity vs. cosine distance:
 dis = 1 - sim
 
-** dotproduct
-** euclid
+** TODO dotproduct
+** TODO euclid
 
-* [#A] Work in mem, serilize to store                                  :core:
+* IN-PROGRESS [#A] Work in mem, serilize to store                      :core:
 or, rather, proper serialization strategy, -- at least so that each
 query doesn't read whole db each time 😄
 
-* IN-PROGRESS [#C] COMMENT LocalStorage vs. IndexDB                            :core:
+** TODO =Collection=: add_points method
+
+* DONE [#C] LocalStorage vs. IndexDB                                   :core:
+CLOSED: [2023-11-18 Sat 14:30]
 
 IndexDB has a binary storage, which might be an advantage. From the
 other hand, it doesn't make sense to create overhead for db by using
@@ -140,8 +143,7 @@ buffer / blob
 *** DONE =AlignedVec= to =ArrayBuffer=, insert points
 CLOSED: [2023-11-17 Fri 01:21]
 
-What is [[https://docs.rs/js-sys/latest/js_sys/struct.SharedArrayBuffer.html][SharedArrayBuffer]]?
-
+** [?] What is [[https://docs.rs/js-sys/latest/js_sys/struct.SharedArrayBuffer.html][SharedArrayBuffer]]?
 
 ** [?] How to call js object methods from rust?
 https://github.com/rustwasm/wasm-bindgen
