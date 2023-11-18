@@ -57,20 +57,20 @@
           await upsert_points(coll, points)
 
 
-          const queryTwellik = (queryEmbeds) => {
+          const queryTwellik = async (queryEmbeds) => {
               let query = {
                   vector: queryEmbeds,
                   payload: {},
                   k: 4
               }
 
-              let searchRes = scroll_points(coll, query)
+              let searchRes = await scroll_points(coll, query)
               return searchRes
           }
 
-          const queryAndRender = (embeds) => {
+          const queryAndRender = async (embeds) => {
 
-              const searchRes = queryTwellik(embeds)
+              const searchRes = await queryTwellik(embeds)
 
               const points = searchRes.map(r => r.point)
 
