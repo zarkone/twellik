@@ -11,6 +11,14 @@ use rkyv::Deserialize;
 use serde;
 use serde_wasm_bindgen;
 
+use lazy_static::lazy_static; // 1.4.0
+use std::sync::Mutex;
+
+lazy_static! {
+    // should be Mutex<Collectoin>
+    static ref MEM_DB_STATE: Mutex<Vec<Point>> = Mutex::new(vec![]);
+}
+
 #[derive(
     rkyv::Archive,
     rkyv::Serialize,
@@ -90,6 +98,15 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
     // TODO: should be async/nonblocking/point-by-point?
     let rs_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
 
+    // sync with in-mem state
+    let mut mem_db = MEM_DB_STATE.lock().unwrap();
+
+    // erase all points to be consistent with the current behavior
+    *mem_db = Vec::new();
+    for point in &rs_points {
+        mem_db.push(point.clone())
+    }
+
     let b_points = rkyv::to_bytes::<_, 256>(&rs_points).unwrap();
 
     // TODO: check unpacked binary
@@ -114,32 +131,42 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
 
 /// Reads collection into memory.
 async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
-    let db = match indexed_db::open_db(coll_name).await {
-        Ok(db) => {
-            twellik_log(format!("Opened db {coll_name}").as_str());
-            db
-        }
-        Err(e) => return Err(e.to_string().into()),
-    };
-
-    let js_points = match indexed_db::get_key(&db, coll_name).await {
-        Ok(v) => match v {
-            Some(p) => p,
-            None => {
-                let msg = format!("Collecton {coll_name} is empty.");
-                twellik_error(&msg);
-                return Err(JsValue::from_str(&msg));
+    let mut mem_db = MEM_DB_STATE.lock().unwrap();
+    if mem_db.is_empty() {
+        let db = match indexed_db::open_db(coll_name).await {
+            Ok(db) => {
+                twellik_log(format!("Opened db {coll_name}").as_str());
+                db
             }
-        },
-        Err(e) => return Err(e.to_string().into()),
-    };
+            Err(e) => return Err(e.to_string().into()),
+        };
 
-    // TODO: should be async/nonblocking/point-by-point?
-    let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+        let js_points = match indexed_db::get_key(&db, coll_name).await {
+            Ok(v) => match v {
+                Some(p) => p,
+                None => {
+                    let msg = format!("Collecton {coll_name} is empty.");
+                    twellik_error(&msg);
+                    return Err(JsValue::from_str(&msg));
+                }
+            },
+            Err(e) => return Err(e.to_string().into()),
+        };
 
-    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
-    let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
-    Ok(Collection { points })
+        // TODO: should be async/nonblocking/point-by-point?
+        let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+
+        let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
+        let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+        Ok(Collection { points })
+    } else {
+        twellik_log("skipping db read, return collection from mem");
+        Ok(Collection {
+            // here we clone a collection, so no point of keeping points in mem ATM actually
+            // however, it should be fixed when we move to keeping Collection
+            points: mem_db.to_vec(),
+        })
+    }
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`

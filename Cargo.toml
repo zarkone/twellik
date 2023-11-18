@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 indexed_db_futures = { version = "0.4.1", default-features = false }
 js-sys = "0.3.65"
+lazy_static = "1.4.0"
 rkyv = { version = "0.7.42", features = ["validation"] }
 serde = { version = "1.0.190", features = ["serde_derive"] }
 serde-wasm-bindgen = "0.6.1"
