@@ -178,42 +178,33 @@ pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsVal
 
 /// Reads collection into memory.
 async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
-    let mut mem_db = MEM_DB_STATE.lock().unwrap();
-    if let Some(coll) = mem_db.get(coll_name) {
-        twellik_debug("skipping db read, return collection from mem");
+    let db = match indexed_db::open_db(coll_name).await {
+        Ok(db) => {
+            twellik_debug(format!("Opened db {coll_name}").as_str());
+            db
+        }
+        Err(e) => return Err(e.to_string().into()),
+    };
 
-        // here we clone a collection, so no point of keeping points in mem ATM actually
-        // however, it should be fixed by moving to Database API
-        Ok(coll.clone())
-    } else {
-        let db = match indexed_db::open_db(coll_name).await {
-            Ok(db) => {
-                twellik_debug(format!("Opened db {coll_name}").as_str());
-                db
+    let js_points = match indexed_db::get_key(&db, coll_name).await {
+        Ok(v) => match v {
+            Some(p) => p,
+            None => {
+                let msg = format!("Collection {coll_name} is empty.");
+                twellik_error(&msg);
+                return Err(JsValue::from_str(&msg));
             }
-            Err(e) => return Err(e.to_string().into()),
-        };
+        },
+        Err(e) => return Err(e.to_string().into()),
+    };
 
-        let js_points = match indexed_db::get_key(&db, coll_name).await {
-            Ok(v) => match v {
-                Some(p) => p,
-                None => {
-                    let msg = format!("Collection {coll_name} is empty.");
-                    twellik_error(&msg);
-                    return Err(JsValue::from_str(&msg));
-                }
-            },
-            Err(e) => return Err(e.to_string().into()),
-        };
+    // TODO: should be async/nonblocking/point-by-point?
+    let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
 
-        // TODO: should be async/nonblocking/point-by-point?
-        let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
+    let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
 
-        let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
-        let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
-
-        Ok(Collection { points })
-    }
+    Ok(Collection { points })
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`
