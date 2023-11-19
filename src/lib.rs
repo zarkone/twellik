@@ -39,7 +39,13 @@ impl Database {
             Err(e) => return Err(e.to_string().into()),
         };
 
-        let collections = HashMap::<String, Collection>::new();
+        let mut collections = HashMap::<String, Collection>::new();
+
+        for store_name in db.object_store_names() {
+            let collection = read_collection(&store_name).await?;
+            collections.insert(store_name, collection);
+        }
+
         Ok(Database { db, collections })
     }
 }
