@@ -91,7 +91,32 @@ dis = 1 - sim
 or, rather, proper serialization strategy, -- at least so that each
 query doesn't read whole db each time 😄
 
-** TODO =Collection=: add_points method
+** HOLD =Collection=: add_points method
+
+** TODO "db" object
+
+After I've spent some time with trying to fight with global mutex and
+safe / borrowing rules of rust, it feels that it becomes more and more
+cumbersome.
+
+The reason is that I can't simply return a pointer to collection or
+points, just because rust thinks that it is not safe. And it makes
+sense.
+
+So I was thinking, maybe it makes sense to revise the API so that all
+the interact with DB by, first, opening db, returning an "object" and
+then interacting with this db via this object.
+
+Need to figure how to do it Rust / WASM
+
+#+begin_src js
+  let db = twellik.open("my-db")
+  // db.create_collection("my-coll")
+  db.upsert_points("my-coll", points)
+  let result = db.scroll_points("my-coll", { vector: [1, 2], k: 10, payload: { foo: 45}})
+#+end_src
+
+[[https://rustwasm.github.io/wasm-bindgen/contributing/design/exporting-rust-struct.html][wasm-bindgen guide: Exporting a struct to JS]]
 
 * DONE [#C] LocalStorage vs. IndexDB                                   :core:
 CLOSED: [2023-11-18 Sat 14:30]

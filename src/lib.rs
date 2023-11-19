@@ -6,6 +6,8 @@ use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
+use indexed_db_futures::IdbDatabase;
+
 use rkyv;
 use rkyv::Deserialize;
 use serde;
@@ -17,6 +19,29 @@ use std::sync::Mutex;
 lazy_static! {
     // should be Mutex<Collectoin>
     static ref MEM_DB_STATE: Mutex<HashMap<String, Collection>> = Mutex::new(HashMap::new());
+}
+
+#[wasm_bindgen]
+struct Database {
+    db: IdbDatabase,
+    collections: HashMap<String, Collection>,
+}
+
+#[wasm_bindgen]
+impl Database {
+    #[wasm_bindgen(constructor)]
+    pub async fn new(coll_name: &str) -> Result<Database, JsValue> {
+        let db = match indexed_db::open_db(coll_name).await {
+            Ok(db) => {
+                twellik_debug(format!("Opened db {coll_name}").as_str());
+                db
+            }
+            Err(e) => return Err(e.to_string().into()),
+        };
+
+        let collections = HashMap::<String, Collection>::new();
+        Ok(Database { db, collections })
+    }
 }
 
 #[derive(
@@ -43,6 +68,11 @@ struct Collection {
     pub points: Vec<Point>,
 }
 
+impl Collection {
+    pub fn scroll_points(query: &Query) -> Option<Vec<QueryResult>> {
+        todo!()
+    }
+}
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct Query {
     vector: Vec<f64>,
