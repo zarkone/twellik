@@ -110,7 +110,7 @@ then interacting with this db via this object.
 Need to figure how to do it Rust / WASM
 
 #+begin_src js
-  let db = twellik.open("my-db")
+  let db = twellik.open("my-coll")
   // db.create_collection("my-coll")
   db.upsert_points("my-coll", points)
   let result = db.scroll_points("my-coll", { vector: [1, 2], k: 10, payload: { foo: 45}})

@@ -11,7 +11,7 @@
     <h2>Semantic Search</h2>
     <div id="result"></div>
     <script type="module">
-      import init, { create_collection, upsert_points, scroll_points } from "./twellik.js";
+      import init, { Twellik } from "./twellik.js";
 
       const getAnimals = async () => {
           let response = await fetch("/animals.json")
@@ -49,11 +49,11 @@
 
       init().then( async () => {
           let coll = "test_collection"
-          create_collection(coll)
+          let twellik = await new Twellik()
 
           let points = await getAnimals()
 
-          await upsert_points(coll, points)
+          await twellik.upsert_points(coll, points)
 
 
           const queryTwellik = async (queryEmbeds) => {
@@ -63,7 +63,7 @@
                   k: 4
               }
 
-              let searchRes = await scroll_points(coll, query)
+              let searchRes = await twellik.scroll_points(coll, query)
               return searchRes
           }
 

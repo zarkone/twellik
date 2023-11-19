@@ -1,6 +1,5 @@
 mod cosine;
 mod indexed_db;
-mod log;
 
 use std::collections::HashMap;
 
@@ -22,31 +21,153 @@ lazy_static! {
 }
 
 #[wasm_bindgen]
-struct Database {
-    db: IdbDatabase,
+pub struct Twellik {
     collections: HashMap<String, Collection>,
 }
 
 #[wasm_bindgen]
-impl Database {
+impl Twellik {
     #[wasm_bindgen(constructor)]
-    pub async fn new(coll_name: &str) -> Result<Database, JsValue> {
-        let db = match indexed_db::open_db(coll_name).await {
-            Ok(db) => {
-                twellik_debug(format!("Opened db {coll_name}").as_str());
-                db
-            }
+    pub async fn new() -> Result<Twellik, JsValue> {
+        let mut collections = HashMap::<String, Collection>::new();
+
+        let key_names = match indexed_db::keys().await {
+            Ok(sn) => sn,
             Err(e) => return Err(e.to_string().into()),
         };
 
-        let mut collections = HashMap::<String, Collection>::new();
+        for key_name in key_names {
+            let js_points = match indexed_db::get_key(&key_name).await {
+                Ok(v) => match v {
+                    Some(p) => p,
+                    None => {
+                        let msg = format!("Collection {key_name} is empty.");
+                        twellik_error(&msg);
+                        return Err(JsValue::from_str(&msg));
+                    }
+                },
+                Err(e) => return Err(e.to_string().into()),
+            };
 
-        for store_name in db.object_store_names() {
-            let collection = read_collection(&store_name).await?;
-            collections.insert(store_name, collection);
+            // TODO: should be async/nonblocking/point-by-point?
+            let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+
+            let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
+            let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+
+            let collection = Collection {
+                points,
+                name: key_name.clone(),
+            };
+
+            collections.insert(key_name, collection);
         }
 
-        Ok(Database { db, collections })
+        twellik_debug("created db.");
+        Ok(Twellik { collections })
+    }
+
+    #[wasm_bindgen]
+    pub async fn upsert_points(&mut self, coll_name: &str, points: JsValue) -> Result<(), JsValue> {
+        let mut new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
+
+        if let Some(coll) = self.collections.get_mut(coll_name) {
+            // append collection to existing
+            coll.points.append(&mut new_points);
+        } else {
+            let name = coll_name.to_string();
+            let coll = Collection {
+                points: new_points,
+                name: name.clone(),
+            };
+            twellik_debug("new collection created.");
+            self.collections.insert(name, coll);
+        };
+
+        self.serialize_collection(coll_name).await?;
+
+        Ok(())
+    }
+
+    async fn serialize_collection(&self, coll_name: &str) -> Result<(), JsValue> {
+        let coll = match self.collections.get(coll_name) {
+            Some(c) => c,
+            None => {
+                let msg = format!(
+                    "FATAL: failed to serialize {coll_name}: collection not found in memory."
+                );
+                twellik_error(&msg);
+                return Err(msg.into());
+            }
+        };
+        let b_points = rkyv::to_bytes::<_, 256>(&coll.points).unwrap();
+        let b_points_u8 = b_points.as_slice();
+        let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
+
+        twellik_debug(format!("Writing collection {} to IndexedDB", &coll.name).as_str());
+
+        match indexed_db::put_key(&coll.name, &b_points_jsval).await {
+            Ok(_) => {
+                twellik_debug(format!("Added points to {}.", &coll.name).as_str());
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!(
+                    "Error inserting points to {}: {}",
+                    &coll.name,
+                    e.to_string()
+                );
+                twellik_error(&msg);
+                Err(msg.into())
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub async fn scroll_points(&self, coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
+        let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
+
+        let coll = match self.collections.get(coll_name) {
+            Some(c) => c,
+            None => {
+                let msg = format!(
+                    "FATAL: failed to serialize {coll_name}: collection not found in memory."
+                );
+                twellik_error(&msg);
+                return Err(msg.into());
+            }
+        };
+
+        let mut matched_points: Vec<QueryResult> = coll
+            .points
+            .iter()
+            .filter(|point| match_payload(&point.payload, &parsed_query.payload))
+            .map(|point| {
+                let distance = cosine::distance(&parsed_query.vector, &point.vector);
+                QueryResult {
+                    point: point.clone(),
+                    distance,
+                }
+            })
+            .collect();
+
+        matched_points.sort_by(|a, b| match a.distance.partial_cmp(&b.distance) {
+            Some(r) => r,
+            None => {
+                println!(
+                    "panic! comparison of these two numbers failed: {0} and {1}",
+                    &a.distance, &b.distance
+                );
+                panic!();
+            }
+        });
+
+        let matched_points: Vec<&QueryResult> =
+            matched_points.iter().take(parsed_query.k).collect();
+
+        twellik_debug(format!("matched: {}", &matched_points.len()).as_str());
+
+        Ok(serde_wasm_bindgen::to_value(&matched_points)?)
     }
 }
 
@@ -68,9 +189,10 @@ struct Point {
 }
 
 /// TODO: Clone is here as a temp workaround,
-/// should be removed after implementing Database
+/// should be removed after implementing Twellik
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct Collection {
+    pub name: String,
     pub points: Vec<Point>,
 }
 
@@ -119,94 +241,6 @@ fn twellik_debug(s: &str) {
     log_debug(format!("Twellik Debug: {s}").as_str())
 }
 
-#[wasm_bindgen]
-/// create_collection is currently useless, however,
-/// we will probably need it in future when we need to set params
-/// before inserting items
-pub async fn create_collection(name: &str) -> Result<(), JsValue> {
-    twellik_warn("HAVE YOU REBUILT WASM?");
-    twellik_debug(format!("{name} collection creation invoked.").as_str());
-
-    Ok(())
-}
-
-#[wasm_bindgen]
-/// TODO: support async
-/// TODO: upsert erases all points currently
-/// TODO: if it is async, js should use await, right?
-pub async fn upsert_points(coll_name: &str, points: JsValue) -> Result<(), JsValue> {
-    let db = match indexed_db::open_db(coll_name).await {
-        Ok(db) => {
-            twellik_debug(format!("Opened db {coll_name}").as_str());
-            db
-        }
-        Err(e) => return Err(e.to_string().into()),
-    };
-
-    // TODO: should be async/nonblocking/point-by-point?
-    let points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
-
-    // sync with in-mem state
-    let mut mem_db = MEM_DB_STATE.lock().unwrap();
-
-    // erase all points to be consi stent with the current behavior
-    let new_coll = Collection { points };
-
-    let b_points = rkyv::to_bytes::<_, 256>(&new_coll.points).unwrap();
-
-    // TODO: check unpacked binary
-    // let archived_points = rkyv::check_archived_root::<Vec<Point>>(&b_points[..]).unwrap();
-    //let rs_points2: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
-    let b_points_u8 = b_points.as_slice();
-    let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
-
-    match indexed_db::put_key(&db, coll_name, &b_points_jsval).await {
-        Ok(_) => {
-            twellik_debug(format!("Added points to {coll_name}.").as_str());
-        }
-        Err(e) => {
-            twellik_error(
-                format!("Error inserting points to {coll_name}: {}", e.to_string()).as_str(),
-            );
-        }
-    };
-
-    mem_db.insert(coll_name.to_string(), new_coll);
-
-    Ok(())
-}
-
-/// Reads collection into memory.
-async fn read_collection(coll_name: &str) -> Result<Collection, JsValue> {
-    let db = match indexed_db::open_db(coll_name).await {
-        Ok(db) => {
-            twellik_debug(format!("Opened db {coll_name}").as_str());
-            db
-        }
-        Err(e) => return Err(e.to_string().into()),
-    };
-
-    let js_points = match indexed_db::get_key(&db, coll_name).await {
-        Ok(v) => match v {
-            Some(p) => p,
-            None => {
-                let msg = format!("Collection {coll_name} is empty.");
-                twellik_error(&msg);
-                return Err(JsValue::from_str(&msg));
-            }
-        },
-        Err(e) => return Err(e.to_string().into()),
-    };
-
-    // TODO: should be async/nonblocking/point-by-point?
-    let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
-
-    let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
-    let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
-
-    Ok(Collection { points })
-}
-
 /// Checks if all fields of `query_fields` are eq to those in `item`
 fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, String>) -> bool {
     if query_fields.is_empty() {
@@ -226,46 +260,6 @@ fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, 
     }
 
     true
-}
-
-#[wasm_bindgen]
-/// Searches through points and returns K amount of closest points
-/// which match the query
-/// TODO: support async
-pub async fn scroll_points(coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
-    let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
-
-    let coll = read_collection(coll_name).await?;
-
-    let mut matched_points: Vec<QueryResult> = coll
-        .points
-        .iter()
-        .filter(|point| match_payload(&point.payload, &parsed_query.payload))
-        .map(|point| {
-            let distance = cosine::distance(&parsed_query.vector, &point.vector);
-            QueryResult {
-                point: point.clone(),
-                distance,
-            }
-        })
-        .collect();
-
-    matched_points.sort_by(|a, b| match a.distance.partial_cmp(&b.distance) {
-        Some(r) => r,
-        None => {
-            println!(
-                "panic! comparison of these two numbers failed: {0} and {1}",
-                &a.distance, &b.distance
-            );
-            panic!();
-        }
-    });
-
-    let matched_points: Vec<&QueryResult> = matched_points.iter().take(parsed_query.k).collect();
-
-    twellik_debug(format!("matched: {}", &matched_points.len()).as_str());
-
-    Ok(serde_wasm_bindgen::to_value(&matched_points)?)
 }
 
 #[cfg(test)]
