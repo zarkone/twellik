@@ -87,11 +87,13 @@ dis = 1 - sim
 ** TODO dotproduct
 ** TODO euclid
 
-* IN-PROGRESS [#A] Work in mem, serilize to store                      :core:
+* DONE [#A] Work in mem, serilize to store                             :core:
+CLOSED: [2023-11-20 Mon 13:25]
 or, rather, proper serialization strategy, -- at least so that each
 query doesn't read whole db each time 😄
 
-** HOLD =Collection=: add_points method
+** CANCELLED =Collection=: add_points method
+CLOSED: [2023-11-20 Mon 13:08]
 
 ** DONE "db" object
 CLOSED: [2023-11-20 Mon 13:08]
@@ -132,6 +134,11 @@ delete object stores and build and remove indices.
 Another words, stores are sort of tables in traditional databases.
 Therefore, I will probably stick to "db -> index binary" shape and
 keep them all in one, global object store
+
+
+** DONE treat "id" as unique key
+CLOSED: [2023-11-20 Mon 13:25]
+
 
 * DONE [#C] LocalStorage vs. IndexDB                                   :core:
 CLOSED: [2023-11-18 Sat 14:30]

@@ -28,12 +28,13 @@ pub struct Twellik {
 impl Twellik {
     #[wasm_bindgen(constructor)]
     pub async fn new() -> Result<Twellik, JsValue> {
+        log::warn("have you updated your WASM?");
         let db = indexed_db::open()
             .await
             .map_err(<indexed_db::IdbError as Into<JsValue>>::into)?;
         let collections = Twellik::pull_db(&db).await?;
 
-        log::debug("created db.");
+        log::debug("initialized db.");
         Ok(Twellik { collections, db })
     }
 
@@ -75,13 +76,18 @@ impl Twellik {
         Ok(collections)
     }
     #[wasm_bindgen]
+    /// TODO: quadratic complexity here for now,
+    /// to be addressed after HNSW impl
     pub async fn upsert_points(&mut self, coll_name: &str, points: JsValue) -> Result<(), JsValue> {
-        let mut new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
+        let new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
 
         if let Some(coll) = self.collections.get_mut(coll_name) {
-            // append collection to existing
-            // TODO: append by id, otherwise non unique wolfs appear
-            coll.points.append(&mut new_points);
+            for new_point in new_points {
+                if !coll.points.contains(&new_point) {
+                    coll.points.push(new_point);
+                }
+            }
+            log::debug("collection updated.");
         } else {
             let name = coll_name.to_string();
             let coll = Collection {
@@ -194,6 +200,12 @@ struct Point {
     id: String,
     vector: Vec<f64>,
     payload: HashMap<String, String>,
+}
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 /// TODO: Clone is here as a temp workaround,
