@@ -1,16 +1,14 @@
 mod cosine;
 mod indexed_db;
-
-use std::collections::HashMap;
-
-use wasm_bindgen::prelude::*;
+mod log;
 
 use indexed_db_futures::IdbDatabase;
-
 use rkyv;
 use rkyv::Deserialize;
 use serde;
 use serde_wasm_bindgen;
+use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 use lazy_static::lazy_static; // 1.4.0
 use std::sync::Mutex;
@@ -22,6 +20,7 @@ lazy_static! {
 
 #[wasm_bindgen]
 pub struct Twellik {
+    db: IdbDatabase,
     collections: HashMap<String, Collection>,
 }
 
@@ -29,20 +28,30 @@ pub struct Twellik {
 impl Twellik {
     #[wasm_bindgen(constructor)]
     pub async fn new() -> Result<Twellik, JsValue> {
+        let db = indexed_db::open()
+            .await
+            .map_err(<indexed_db::IdbError as Into<JsValue>>::into)?;
+        let collections = Twellik::pull_db(&db).await?;
+
+        log::debug("created db.");
+        Ok(Twellik { collections, db })
+    }
+
+    async fn pull_db(db: &IdbDatabase) -> Result<HashMap<String, Collection>, JsValue> {
         let mut collections = HashMap::<String, Collection>::new();
 
-        let key_names = match indexed_db::keys().await {
+        let key_names = match indexed_db::keys(&db).await {
             Ok(sn) => sn,
             Err(e) => return Err(e.to_string().into()),
         };
 
         for key_name in key_names {
-            let js_points = match indexed_db::get_key(&key_name).await {
+            let js_points = match indexed_db::get_key(&db, &key_name).await {
                 Ok(v) => match v {
                     Some(p) => p,
                     None => {
                         let msg = format!("Collection {key_name} is empty.");
-                        twellik_error(&msg);
+                        log::error(&msg);
                         return Err(JsValue::from_str(&msg));
                     }
                 },
@@ -63,10 +72,8 @@ impl Twellik {
             collections.insert(key_name, collection);
         }
 
-        twellik_debug("created db.");
-        Ok(Twellik { collections })
+        Ok(collections)
     }
-
     #[wasm_bindgen]
     pub async fn upsert_points(&mut self, coll_name: &str, points: JsValue) -> Result<(), JsValue> {
         let mut new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
@@ -81,7 +88,7 @@ impl Twellik {
                 points: new_points,
                 name: name.clone(),
             };
-            twellik_debug("new collection created.");
+            log::debug("new collection created.");
             self.collections.insert(name, coll);
         };
 
@@ -97,7 +104,7 @@ impl Twellik {
                 let msg = format!(
                     "FATAL: failed to serialize {coll_name}: collection not found in memory."
                 );
-                twellik_error(&msg);
+                log::error(&msg);
                 return Err(msg.into());
             }
         };
@@ -105,11 +112,11 @@ impl Twellik {
         let b_points_u8 = b_points.as_slice();
         let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
 
-        twellik_debug(format!("Writing collection {} to IndexedDB", &coll.name).as_str());
+        log::debug(format!("Writing collection {} to IndexedDB", &coll.name).as_str());
 
-        match indexed_db::put_key(&coll.name, &b_points_jsval).await {
+        match indexed_db::put_key(&self.db, &coll.name, &b_points_jsval).await {
             Ok(_) => {
-                twellik_debug(format!("Added points to {}.", &coll.name).as_str());
+                log::debug(format!("Added points to {}.", &coll.name).as_str());
                 Ok(())
             }
             Err(e) => {
@@ -118,7 +125,7 @@ impl Twellik {
                     &coll.name,
                     e.to_string()
                 );
-                twellik_error(&msg);
+                log::error(&msg);
                 Err(msg.into())
             }
         }
@@ -134,7 +141,7 @@ impl Twellik {
                 let msg = format!(
                     "FATAL: failed to serialize {coll_name}: collection not found in memory."
                 );
-                twellik_error(&msg);
+                log::error(&msg);
                 return Err(msg.into());
             }
         };
@@ -166,7 +173,7 @@ impl Twellik {
         let matched_points: Vec<&QueryResult> =
             matched_points.iter().take(parsed_query.k).collect();
 
-        twellik_debug(format!("matched: {}", &matched_points.len()).as_str());
+        log::debug(format!("matched: {}", &matched_points.len()).as_str());
 
         Ok(serde_wasm_bindgen::to_value(&matched_points)?)
     }
@@ -209,33 +216,6 @@ struct Query {
 struct QueryResult {
     point: Point,
     distance: f64,
-}
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log(s: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = error)]
-    fn log_error(s: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = warn)]
-    fn log_warn(s: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = debug)]
-    fn log_debug(s: &str);
-}
-
-fn twellik_log(s: &str) {
-    log(format!("Twellik: {s}").as_str())
-}
-
-fn twellik_error(s: &str) {
-    log_error(format!("Twellik Error: {s}").as_str())
-}
-
-fn twellik_warn(s: &str) {
-    log_warn(format!("Twellik Warn: {s}").as_str())
-}
-fn twellik_debug(s: &str) {
-    log_debug(format!("Twellik Debug: {s}").as_str())
 }
 
 /// Checks if all fields of `query_fields` are eq to those in `item`

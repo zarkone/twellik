@@ -93,7 +93,8 @@ query doesn't read whole db each time 😄
 
 ** HOLD =Collection=: add_points method
 
-** TODO "db" object
+** DONE "db" object
+CLOSED: [2023-11-20 Mon 13:08]
 
 After I've spent some time with trying to fight with global mutex and
 safe / borrowing rules of rust, it feels that it becomes more and more
