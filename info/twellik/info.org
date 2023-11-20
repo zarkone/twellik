@@ -27,3 +27,45 @@ have the potential to find real-world applications.
 * misc / links
 
 [[https://rustwasm.github.io/docs/book/reference/crates.html?highlight=crates#crates-you-should-know][Rust and WebAssembly: crates you should know]]
+
+* hnsw-related
+
+** knn
+
+** nsw
+
+** a-knn (approximate knn)
+
+** proximity graphs
+
+** lsh (locally-sensitive hashing)
+
+** product quantization
+
+** probabilistic skip list
+https://en.wikipedia.org/wiki/Skip_list
+
+** greedy algorithm
+
+[[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs]]
+
+[[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
+
+** knn
+
+** nsw
+
+** a-knn (approximate knn)
+
+** proximity graphs
+
+** lsh (locally-sensitive hashing)
+
+** product quantization
+
+** probabilistic skip list
+https://en.wikipedia.org/wiki/Skip_list
+
+** greedy algorithm
+
+** Levenshtein distance

@@ -35,44 +35,6 @@ Hierarchical Navigable Small World graphs]]
 
 [[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
 
-** knn
-
-** nsw
-
-** a-knn (approximate knn)
-
-** proximity graphs
-
-** lsh (locally-sensitive hashing)
-
-** product quantization
-
-** probabilistic skip list
-https://en.wikipedia.org/wiki/Skip_list
-
-** greedy algorithm
-
-[[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs]]
-
-[[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
-
-** knn
-
-** nsw
-
-** a-knn (approximate knn)
-
-** proximity graphs
-
-** lsh (locally-sensitive hashing)
-
-** product quantization
-
-** probabilistic skip list
-https://en.wikipedia.org/wiki/Skip_list
-
-** greedy algorithm
-
 * [#A] Add support for distance formulas                               :core:
 
 Curently, we have only poor implementation of cosine -- which might
@@ -224,7 +186,8 @@ https://github.com/Alorel/rust-indexed-db
 
 
 
-* [?] Consider js/ts wrapper
+* CANCELLED [?] Consider js/ts wrapper
+CLOSED: [2023-11-20 Mon 16:08]
 After I've spent some time with web_sys and indexed_db, I found it
 pretty hard to make a wrappre for indexed db inside of WASM.
 
@@ -237,6 +200,8 @@ feels too tricky for a simple db_open operation.
 Mabe I should better make a small wrapper which opens db in JS and
 passes it into WASM after? So that Rust assumes that it is ready and
 successfully opened, to avoid all this hustle.
+--
+cancelling for now, using indexeddb futures crate
 
 * [#C] WebGPU and vector instructions                                  :perf:
 
@@ -251,6 +216,9 @@ WASM, in browser in particular
 *** what we can do with vector instructions, what types do we have :question:
 
 SIMD
+
+[!] hnsw_rs also has support for SIMD. However, I don't think it has
+WASM simd support: but it might be handled via std/rustc?
 
 [[https://gist.github.com/kbarbary/9efb3650f1b69b2b6b18e34ad347777b][Vector-matrix-vector multiplication with SIMD (AVX) intrinsics]]
 
@@ -336,6 +304,8 @@ https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instruct
 https://doc.rust-lang.org/beta/core/arch/wasm32/index.html#simd
 
 [[https://v8.dev/features/simd]]
+
+
 
 ** WebGPU
 turns out, webgl can be used to search textures!
