@@ -69,3 +69,16 @@ https://en.wikipedia.org/wiki/Skip_list
 ** greedy algorithm
 
 ** Levenshtein distance
+
+* [[https://doc.rust-lang.org/reference/items/extern-crates.html][extern crate]]
+
+* [[https://doc.rust-lang.org/reference/names/preludes.html?highlight=prelu#preludes][preludes]]
+
+* wasm panics
+
+today, set hook on panic helped to understand that it panicked not because of
+hnsw_rs is not compatible with WASM, but because I've changed the type
+of =id= field in =Collection= struct. rkyv failed on check.
+
+Check should've been caught, actually, not panic, but it is a
+different story.

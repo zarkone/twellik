@@ -2,6 +2,8 @@ mod cosine;
 mod indexed_db;
 mod log;
 
+extern crate console_error_panic_hook;
+
 use indexed_db_futures::IdbDatabase;
 use rkyv;
 use rkyv::Deserialize;
@@ -20,6 +22,7 @@ pub struct Twellik {
 impl Twellik {
     #[wasm_bindgen(constructor)]
     pub async fn new() -> Result<Twellik, JsValue> {
+        console_error_panic_hook::set_once();
         log::warn("have you updated your WASM?");
         let db = indexed_db::open()
             .await
@@ -54,8 +57,20 @@ impl Twellik {
             // TODO: should be async/nonblocking/point-by-point?
             let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
 
-            let archived_points = rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]).unwrap();
-            let points: Vec<Point> = archived_points.deserialize(&mut rkyv::Infallible).unwrap();
+            let archived_points = match rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error("pull_db: error checking bytes of db value -- did you change the data or datastructure?");
+                    return Err(e.to_string().into());
+                }
+            };
+            let points: Vec<Point> = match archived_points.deserialize(&mut rkyv::Infallible) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error("pull_db: while trying to deserialize:");
+                    return Err(e.to_string().into());
+                }
+            };
 
             let collection = Collection {
                 points,
@@ -189,7 +204,7 @@ impl Twellik {
 #[archive(check_bytes)]
 struct Point {
     /// TODO: id should be uuid or any
-    id: String,
+    id: u32,
     vector: Vec<f64>,
     payload: HashMap<String, String>,
 }
