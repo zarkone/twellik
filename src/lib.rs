@@ -10,14 +10,6 @@ use serde_wasm_bindgen;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
-use lazy_static::lazy_static; // 1.4.0
-use std::sync::Mutex;
-
-lazy_static! {
-    // should be Mutex<Collectoin>
-    static ref MEM_DB_STATE: Mutex<HashMap<String, Collection>> = Mutex::new(HashMap::new());
-}
-
 #[wasm_bindgen]
 pub struct Twellik {
     db: IdbDatabase,
