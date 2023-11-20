@@ -13,6 +13,8 @@ pub enum IdbError {
     #[error("can't WASM env error: {0}")]
     EnvError(String),
 }
+const DB_AND_STORE_NAME: &str = "_twellik";
+
 impl From<DomException> for IdbError {
     fn from(value: DomException) -> Self {
         log_error(value.to_string().as_string().unwrap_or("".into()).as_str());
@@ -33,13 +35,17 @@ extern "C" {
 }
 
 pub async fn put_key(key: &str, value: &JsValue) -> Result<(), IdbError> {
-    let mut db_req: OpenDbRequest = IdbDatabase::open_u32("_twellik", 1)?;
+    let mut db_req: OpenDbRequest = IdbDatabase::open_u32(DB_AND_STORE_NAME, 1)?;
 
     db_req.set_on_upgrade_needed(Some(
         move |evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             // Check if the object store exists; create it if it doesn't
-            if let None = evt.db().object_store_names().find(|n| n == "_twellik") {
-                evt.db().create_object_store("_twellik")?;
+            if let None = evt
+                .db()
+                .object_store_names()
+                .find(|n| n == DB_AND_STORE_NAME)
+            {
+                evt.db().create_object_store(DB_AND_STORE_NAME)?;
             }
             Ok(())
         },
@@ -48,8 +54,8 @@ pub async fn put_key(key: &str, value: &JsValue) -> Result<(), IdbError> {
     let db: IdbDatabase = db_req.await?;
 
     let tx: IdbTransaction =
-        db.transaction_on_one_with_mode("_twellik", IdbTransactionMode::Readwrite)?;
-    let store: IdbObjectStore = tx.object_store("_twellik")?;
+        db.transaction_on_one_with_mode(DB_AND_STORE_NAME, IdbTransactionMode::Readwrite)?;
+    let store: IdbObjectStore = tx.object_store(DB_AND_STORE_NAME)?;
 
     store.put_key_val_owned(key, value)?;
     tx.await.into_result()?;
@@ -57,19 +63,23 @@ pub async fn put_key(key: &str, value: &JsValue) -> Result<(), IdbError> {
     Ok(())
 }
 pub async fn open() -> Result<IdbDatabase, IdbError> {
-    let db_req: OpenDbRequest = IdbDatabase::open_u32("_twellik", 1)?;
+    let db_req: OpenDbRequest = IdbDatabase::open_u32(DB_AND_STORE_NAME, 1)?;
     let db: IdbDatabase = db_req.await?;
     Ok(db)
 }
 
 pub async fn get_key(key: &str) -> Result<Option<JsValue>, IdbError> {
-    let mut db_req: OpenDbRequest = IdbDatabase::open_u32("_twellik", 1)?;
+    let mut db_req: OpenDbRequest = IdbDatabase::open_u32(DB_AND_STORE_NAME, 1)?;
 
     db_req.set_on_upgrade_needed(Some(
         move |evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             // Check if the object store exists; create it if it doesn't
-            if let None = evt.db().object_store_names().find(|n| n == "_twellik") {
-                evt.db().create_object_store("_twellik")?;
+            if let None = evt
+                .db()
+                .object_store_names()
+                .find(|n| n == DB_AND_STORE_NAME)
+            {
+                evt.db().create_object_store(DB_AND_STORE_NAME)?;
             }
             Ok(())
         },
@@ -78,8 +88,8 @@ pub async fn get_key(key: &str) -> Result<Option<JsValue>, IdbError> {
     let db: IdbDatabase = db_req.await?;
 
     let tx: IdbTransaction =
-        db.transaction_on_one_with_mode("_twellik", IdbTransactionMode::Readonly)?;
-    let store: IdbObjectStore = tx.object_store("_twellik")?;
+        db.transaction_on_one_with_mode(DB_AND_STORE_NAME, IdbTransactionMode::Readonly)?;
+    let store: IdbObjectStore = tx.object_store(DB_AND_STORE_NAME)?;
 
     let value: Option<JsValue> = store.get_owned(key)?.await?;
 
@@ -87,13 +97,17 @@ pub async fn get_key(key: &str) -> Result<Option<JsValue>, IdbError> {
 }
 
 pub async fn keys() -> Result<Vec<String>, IdbError> {
-    let mut db_req: OpenDbRequest = IdbDatabase::open_u32("_twellik", 1)?;
+    let mut db_req: OpenDbRequest = IdbDatabase::open_u32(DB_AND_STORE_NAME, 1)?;
 
     db_req.set_on_upgrade_needed(Some(
         move |evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             // Check if the object store exists; create it if it doesn't
-            if let None = evt.db().object_store_names().find(|n| n == "_twellik") {
-                evt.db().create_object_store("_twellik")?;
+            if let None = evt
+                .db()
+                .object_store_names()
+                .find(|n| n == DB_AND_STORE_NAME)
+            {
+                evt.db().create_object_store(DB_AND_STORE_NAME)?;
             }
             Ok(())
         },
@@ -102,8 +116,8 @@ pub async fn keys() -> Result<Vec<String>, IdbError> {
     let db: IdbDatabase = db_req.await?;
 
     let tx: IdbTransaction =
-        db.transaction_on_one_with_mode("_twellik", IdbTransactionMode::Readonly)?;
-    let store: IdbObjectStore = tx.object_store("_twellik")?;
+        db.transaction_on_one_with_mode(DB_AND_STORE_NAME, IdbTransactionMode::Readonly)?;
+    let store: IdbObjectStore = tx.object_store(DB_AND_STORE_NAME)?;
 
     let js_names = store.get_all_keys()?.await?.to_vec();
     let mut names: Vec<String> = Vec::new();

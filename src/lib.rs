@@ -73,6 +73,7 @@ impl Twellik {
 
         if let Some(coll) = self.collections.get_mut(coll_name) {
             // append collection to existing
+            // TODO: append by id, otherwise non unique wolfs appear
             coll.points.append(&mut new_points);
         } else {
             let name = coll_name.to_string();
@@ -196,11 +197,7 @@ struct Collection {
     pub points: Vec<Point>,
 }
 
-impl Collection {
-    pub fn scroll_points(query: &Query) -> Option<Vec<QueryResult>> {
-        todo!()
-    }
-}
+impl Collection {}
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct Query {
     vector: Vec<f64>,
