@@ -118,6 +118,20 @@ Need to figure how to do it Rust / WASM
 
 [[https://rustwasm.github.io/wasm-bindgen/contributing/design/exporting-rust-struct.html][wasm-bindgen guide: Exporting a struct to JS]]
 
+*** Object stores in indexeddb can be only created in =onupgradeneeded=
+
+from [[https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB#creating_and_structuring_the_store][Using IndexedDB: Creating and structuring the store]]:
+
+#+begin_quote
+As indicated previously, onupgradeneeded is the only place where you
+can alter the structure of the database. In it, you can create and
+delete object stores and build and remove indices.
+#+end_quote
+
+Another words, stores are sort of tables in traditional databases.
+Therefore, I will probably stick to "db -> index binary" shape and
+keep them all in one, global object store
+
 * DONE [#C] LocalStorage vs. IndexDB                                   :core:
 CLOSED: [2023-11-18 Sat 14:30]
 
