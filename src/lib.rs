@@ -1,16 +1,45 @@
 mod cosine;
+mod dist;
 mod indexed_db;
 mod log;
+mod point;
 
 extern crate console_error_panic_hook;
 
 use indexed_db_futures::IdbDatabase;
+use point::Point;
 use rkyv;
-use rkyv::Deserialize;
+use rkyv::{Archive, Deserialize, Serialize};
 use serde;
 use serde_wasm_bindgen;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
+
+use hnsw::{Hnsw, Searcher};
+use rand_pcg::Pcg64;
+
+// TODO: remove
+fn test_hnsw() -> (Hnsw<dist::Cosine, Vec<f64>, Pcg64, 12, 24>, Searcher<u64>) {
+    let mut searcher = Searcher::default();
+    let mut hnsw = Hnsw::new(dist::Cosine);
+
+    let features = vec![
+        vec![0.0, 0.0, 0.0, 1.0],
+        vec![0.0, 0.0, 1.0, 0.0],
+        vec![0.0, 1.0, 0.0, 0.0],
+        vec![1.0, 0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 1.0, 1.0, 0.0],
+        vec![1.0, 1.0, 0.0, 0.0],
+        vec![1.0, 0.0, 0.0, 1.0],
+    ];
+
+    for feature in &features {
+        hnsw.insert(feature.clone(), &mut searcher);
+    }
+    log::debug(format!("hnsw len: {}", hnsw.len()).as_str());
+    (hnsw, searcher)
+}
 
 #[wasm_bindgen]
 pub struct Twellik {
@@ -24,6 +53,10 @@ impl Twellik {
     pub async fn new() -> Result<Twellik, JsValue> {
         console_error_panic_hook::set_once();
         log::warn("have you updated your WASM?");
+
+        // TODO: remove
+        test_hnsw();
+
         let db = indexed_db::open()
             .await
             .map_err(<indexed_db::IdbError as Into<JsValue>>::into)?;
@@ -42,7 +75,7 @@ impl Twellik {
         };
 
         for key_name in key_names {
-            let js_points = match indexed_db::get_key(&db, &key_name).await {
+            let js_coll = match indexed_db::get_key(&db, &key_name).await {
                 Ok(v) => match v {
                     Some(p) => p,
                     None => {
@@ -55,16 +88,16 @@ impl Twellik {
             };
 
             // TODO: should be async/nonblocking/point-by-point?
-            let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+            let raw_coll: &[u8] = serde_wasm_bindgen::from_value(js_coll)?;
 
-            let archived_points = match rkyv::check_archived_root::<Vec<Point>>(&raw_points[..]) {
+            let archived_coll = match rkyv::check_archived_root::<Collection>(raw_coll) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error("pull_db: error checking bytes of db value -- did you change the data or datastructure?");
                     return Err(e.to_string().into());
                 }
             };
-            let points: Vec<Point> = match archived_points.deserialize(&mut rkyv::Infallible) {
+            let coll: Collection = match archived_coll.deserialize(&mut rkyv::Infallible) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error("pull_db: while trying to deserialize:");
@@ -72,12 +105,7 @@ impl Twellik {
                 }
             };
 
-            let collection = Collection {
-                points,
-                name: key_name.clone(),
-            };
-
-            collections.insert(key_name, collection);
+            collections.insert(key_name, coll);
         }
 
         Ok(collections)
@@ -90,15 +118,16 @@ impl Twellik {
 
         if let Some(coll) = self.collections.get_mut(coll_name) {
             for new_point in new_points {
-                if !coll.points.contains(&new_point) {
-                    coll.points.push(new_point);
-                }
+                // TODO: check what if insert the same
+                coll.index.insert(new_point)
             }
             log::debug("collection updated.");
         } else {
             let name = coll_name.to_string();
+            let mut hnsw = Hnsw::new(dist::Cosine);
             let coll = Collection {
-                points: new_points,
+                index: hnsw,
+
                 name: name.clone(),
             };
             log::debug("new collection created.");
@@ -121,13 +150,13 @@ impl Twellik {
                 return Err(msg.into());
             }
         };
-        let b_points = rkyv::to_bytes::<_, 256>(&coll.points).unwrap();
-        let b_points_u8 = b_points.as_slice();
-        let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
+        let b_coll = rkyv::to_bytes::<_, 256>(&coll).unwrap();
+        let b_coll_u8 = b_coll.as_slice();
+        let b_coll_jsval = serde_wasm_bindgen::to_value(&b_coll_u8).unwrap();
 
         log::debug(format!("Writing collection {} to IndexedDB", &coll.name).as_str());
 
-        match indexed_db::put_key(&self.db, &coll.name, &b_points_jsval).await {
+        match indexed_db::put_key(&self.db, &coll.name, &b_coll_jsval).await {
             Ok(_) => {
                 log::debug(format!("Added points to {}.", &coll.name).as_str());
                 Ok(())
@@ -147,6 +176,11 @@ impl Twellik {
     #[wasm_bindgen]
     pub async fn scroll_points(&self, coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
         let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
+        let query_point = Point {
+            id: 0,
+            vector: parsed_query.vector.clone(),
+            payload: parsed_query.payload.clone(),
+        };
 
         let coll = match self.collections.get(coll_name) {
             Some(c) => c,
@@ -160,7 +194,8 @@ impl Twellik {
         };
 
         let mut matched_points: Vec<QueryResult> = coll
-            .points
+            .index
+            .nearest(query_point)
             .iter()
             .filter(|point| match_payload(&point.payload, &parsed_query.payload))
             .map(|point| {
@@ -192,35 +227,11 @@ impl Twellik {
     }
 }
 
-#[derive(
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    serde::Serialize,
-    serde::Deserialize,
-    Debug,
-    Clone,
-)]
+#[derive(Archive, Serialize, Deserialize)]
 #[archive(check_bytes)]
-struct Point {
-    /// TODO: id should be uuid or any
-    id: u32,
-    vector: Vec<f64>,
-    payload: HashMap<String, String>,
-}
-
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-/// TODO: Clone is here as a temp workaround,
-/// should be removed after implementing Twellik
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct Collection {
     pub name: String,
-    pub points: Vec<Point>,
+    pub index: Hnsw<dist::Cosine, Point, Pcg64, 12, 24>,
 }
 
 impl Collection {}

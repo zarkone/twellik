@@ -18,7 +18,7 @@
     in {
       devShell = pkgs.mkShell {
         name = "twellik";
-        packages = with pkgs; [ wasm-pack python3];
+        packages = with pkgs; [ wasm-pack python3 watchexec ];
         nativeBuildInputs = [
           # build
           rust-nightly
