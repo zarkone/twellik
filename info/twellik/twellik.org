@@ -27,13 +27,33 @@ into vector db suitable vectors properly:
 
 https://www.pinecone.io/learn/clip-image-search/
 
-* TODO [#A] Hierarchical Navigable Small Worlds (HNSW)                 :core:
+* IN-PROGRESS [#A] Hierarchical Navigable Small Worlds (HNSW)          :core:
 
 [[https://www.pinecone.io/learn/series/faiss/hnsw/][Pinecone: HNSW]]
 [[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using
 Hierarchical Navigable Small World graphs]]
 
 [[https://github.com/jean-pierreBoth/hnswlib-rs/blob/master/tests/filtertest.rs][hnswlib-rs exmaple of filter]]
+
+** HOLD Using rkyv with external creates, for Hnsw?
+I've hit the error:
+
+#+begin_quote
+the trait =Archive= is not implemented for =Hnsw<Cosine, Point, Lcg128Xsl64, 12, 24>=
+#+end_quote
+
+Apparently it is not trivial to do: so I put this one on hold and
+opt-out to [[Serialize Vec<Point> and build HNSW from Points instead][Serialize =Vec<Point>= instead]]
+
+*** Examples of =Archive= for external types
+
+[[https://gist.github.com/MaxOhn/f5e2ea72f745f7c9ddec7d4963a6042d][Gist: Archiving by using a wrapper]]
+[[https://docs.rs/rkyv/latest/rkyv/trait.Archive.html#examples][rkyv: =OwnedStr= example]]
+[[https://github.com/rkyv/rkyv/issues/400][#400: Deriving Archive with foreign types]]
+[[https://github.com/rkyv/rkyv/issues/262][#262: Question: recommended pattern for enum with unsupported types?]]
+
+** TODO Serialize Vec<Point> and build HNSW from Points instead
+I found it too hard
 
 * [#A] Add support for distance formulas                               :core:
 

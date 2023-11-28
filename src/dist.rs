@@ -30,7 +30,7 @@ pub fn similarity(a: &Vec<f64>, b: &Vec<f64>) -> f64 {
 impl Metric<Point> for Cosine {
     type Unit = u64;
     fn distance(&self, a: &Point, b: &Point) -> u64 {
-        let dist = 1.0 - similarity(a.vector, b.vector);
+        let dist = 1.0 - similarity(&a.vector, &b.vector);
         dist.to_bits()
     }
 }

@@ -1,45 +1,22 @@
-mod cosine;
 mod dist;
+mod index;
 mod indexed_db;
 mod log;
 mod point;
+mod query;
 
 extern crate console_error_panic_hook;
 
+use crate::index::HnswIndex;
+use crate::index::Index;
+use crate::point::Point;
+use crate::query::{Query, QueryResult};
 use indexed_db_futures::IdbDatabase;
-use point::Point;
 use rkyv;
-use rkyv::{Archive, Deserialize, Serialize};
-use serde;
+use rkyv::Deserialize;
 use serde_wasm_bindgen;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
-
-use hnsw::{Hnsw, Searcher};
-use rand_pcg::Pcg64;
-
-// TODO: remove
-fn test_hnsw() -> (Hnsw<dist::Cosine, Vec<f64>, Pcg64, 12, 24>, Searcher<u64>) {
-    let mut searcher = Searcher::default();
-    let mut hnsw = Hnsw::new(dist::Cosine);
-
-    let features = vec![
-        vec![0.0, 0.0, 0.0, 1.0],
-        vec![0.0, 0.0, 1.0, 0.0],
-        vec![0.0, 1.0, 0.0, 0.0],
-        vec![1.0, 0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 1.0, 1.0],
-        vec![0.0, 1.0, 1.0, 0.0],
-        vec![1.0, 1.0, 0.0, 0.0],
-        vec![1.0, 0.0, 0.0, 1.0],
-    ];
-
-    for feature in &features {
-        hnsw.insert(feature.clone(), &mut searcher);
-    }
-    log::debug(format!("hnsw len: {}", hnsw.len()).as_str());
-    (hnsw, searcher)
-}
 
 #[wasm_bindgen]
 pub struct Twellik {
@@ -53,9 +30,6 @@ impl Twellik {
     pub async fn new() -> Result<Twellik, JsValue> {
         console_error_panic_hook::set_once();
         log::warn("have you updated your WASM?");
-
-        // TODO: remove
-        test_hnsw();
 
         let db = indexed_db::open()
             .await
@@ -75,7 +49,7 @@ impl Twellik {
         };
 
         for key_name in key_names {
-            let js_coll = match indexed_db::get_key(&db, &key_name).await {
+            let js_points = match indexed_db::get_key(&db, &key_name).await {
                 Ok(v) => match v {
                     Some(p) => p,
                     None => {
@@ -88,21 +62,34 @@ impl Twellik {
             };
 
             // TODO: should be async/nonblocking/point-by-point?
-            let raw_coll: &[u8] = serde_wasm_bindgen::from_value(js_coll)?;
 
-            let archived_coll = match rkyv::check_archived_root::<Collection>(raw_coll) {
+            let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
+
+            let archived_points = match rkyv::check_archived_root::<Vec<Point>>(&raw_points) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error("pull_db: error checking bytes of db value -- did you change the data or datastructure?");
                     return Err(e.to_string().into());
                 }
             };
-            let coll: Collection = match archived_coll.deserialize(&mut rkyv::Infallible) {
+            let points: Vec<Point> = match archived_points.deserialize(&mut rkyv::Infallible) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error("pull_db: while trying to deserialize:");
                     return Err(e.to_string().into());
                 }
+            };
+
+            let mut hnsw = HnswIndex::default();
+
+            for point in points.clone() {
+                hnsw.insert(point);
+            }
+
+            let coll = Collection {
+                name: key_name.clone(),
+                points,
+                index: Box::new(hnsw),
             };
 
             collections.insert(key_name, coll);
@@ -124,10 +111,10 @@ impl Twellik {
             log::debug("collection updated.");
         } else {
             let name = coll_name.to_string();
-            let mut hnsw = Hnsw::new(dist::Cosine);
+            let hnsw = HnswIndex::default();
             let coll = Collection {
-                index: hnsw,
-
+                index: Box::new(hnsw),
+                points: new_points,
                 name: name.clone(),
             };
             log::debug("new collection created.");
@@ -150,13 +137,13 @@ impl Twellik {
                 return Err(msg.into());
             }
         };
-        let b_coll = rkyv::to_bytes::<_, 256>(&coll).unwrap();
-        let b_coll_u8 = b_coll.as_slice();
-        let b_coll_jsval = serde_wasm_bindgen::to_value(&b_coll_u8).unwrap();
+        let b_points = rkyv::to_bytes::<_, 256>(&coll.points).unwrap();
+        let b_points_u8 = b_points.as_slice();
+        let b_points_jsval = serde_wasm_bindgen::to_value(&b_points_u8).unwrap();
 
         log::debug(format!("Writing collection {} to IndexedDB", &coll.name).as_str());
 
-        match indexed_db::put_key(&self.db, &coll.name, &b_coll_jsval).await {
+        match indexed_db::put_key(&self.db, &coll.name, &b_points_jsval).await {
             Ok(_) => {
                 log::debug(format!("Added points to {}.", &coll.name).as_str());
                 Ok(())
@@ -174,13 +161,12 @@ impl Twellik {
     }
 
     #[wasm_bindgen]
-    pub async fn scroll_points(&self, coll_name: &str, query: JsValue) -> Result<JsValue, JsValue> {
+    pub async fn scroll_points(
+        &mut self,
+        coll_name: &str,
+        query: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let parsed_query: Query = serde_wasm_bindgen::from_value(query)?;
-        let query_point = Point {
-            id: 0,
-            vector: parsed_query.vector.clone(),
-            payload: parsed_query.payload.clone(),
-        };
 
         let coll = match self.collections.get(coll_name) {
             Some(c) => c,
@@ -193,19 +179,7 @@ impl Twellik {
             }
         };
 
-        let mut matched_points: Vec<QueryResult> = coll
-            .index
-            .nearest(query_point)
-            .iter()
-            .filter(|point| match_payload(&point.payload, &parsed_query.payload))
-            .map(|point| {
-                let distance = cosine::distance(&parsed_query.vector, &point.vector);
-                QueryResult {
-                    point: point.clone(),
-                    distance,
-                }
-            })
-            .collect();
+        let mut matched_points: Vec<QueryResult> = coll.index.scroll(&parsed_query);
 
         matched_points.sort_by(|a, b| match a.distance.partial_cmp(&b.distance) {
             Some(r) => r,
@@ -227,87 +201,10 @@ impl Twellik {
     }
 }
 
-#[derive(Archive, Serialize, Deserialize)]
-#[archive(check_bytes)]
 struct Collection {
     pub name: String,
-    pub index: Hnsw<dist::Cosine, Point, Pcg64, 12, 24>,
+    pub points: Vec<Point>,
+    pub index: Box<dyn Index>,
 }
 
 impl Collection {}
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct Query {
-    vector: Vec<f64>,
-    payload: HashMap<String, String>,
-    k: usize,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct QueryResult {
-    point: Point,
-    distance: f64,
-}
-
-/// Checks if all fields of `query_fields` are eq to those in `item`
-fn match_payload(item: &HashMap<String, String>, query_fields: &HashMap<String, String>) -> bool {
-    if query_fields.is_empty() {
-        return true;
-    }
-
-    for (key, val) in query_fields {
-        let item_val = item.get(key);
-        if let Some(found_key) = item_val {
-            if found_key.eq(val) {
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    true
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::match_payload;
-    use std::collections::HashMap;
-
-    #[test]
-    fn match_payload_test_happy() {
-        let item = HashMap::from([
-            ("a".to_string(), "one".to_string()),
-            ("b".to_string(), "two".to_string()),
-            ("c".to_string(), "three".to_string()),
-        ]);
-
-        let query_fields = HashMap::from([
-            ("a".to_string(), "one".to_string()),
-            ("b".to_string(), "two".to_string()),
-            ("c".to_string(), "three".to_string()),
-        ]);
-
-        let result = match_payload(&item, &query_fields);
-
-        assert!(result);
-    }
-
-    #[test]
-    fn match_payload_test_two() {
-        let item = HashMap::from([
-            ("a".to_string(), "one".to_string()),
-            ("b".to_string(), "two".to_string()),
-            ("c".to_string(), "three".to_string()),
-        ]);
-
-        let query_fields = HashMap::from([
-            ("a".to_string(), "one".to_string()),
-            ("b".to_string(), "one".to_string()),
-        ]);
-
-        let result = match_payload(&item, &query_fields);
-
-        assert!(!result);
-    }
-}

@@ -1,8 +1,10 @@
-use rkyv::{Archive, Deserialize, Serialize};
+use rkyv::Archive;
 use serde;
 use std::collections::HashMap;
 
-#[derive(Archive, Serialize, Deserialize, serde::Deserialize)]
+#[derive(
+    Archive, rkyv::Serialize, rkyv::Deserialize, serde::Deserialize, serde::Serialize, Clone, Debug,
+)]
 #[archive(check_bytes)]
 pub struct Point {
     /// TODO: id should be uuid or any
