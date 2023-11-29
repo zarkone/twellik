@@ -52,8 +52,12 @@ opt-out to [[Serialize Vec<Point> and build HNSW from Points instead][Serialize 
 [[https://github.com/rkyv/rkyv/issues/400][#400: Deriving Archive with foreign types]]
 [[https://github.com/rkyv/rkyv/issues/262][#262: Question: recommended pattern for enum with unsupported types?]]
 
-** TODO Serialize Vec<Point> and build HNSW from Points instead
-I found it too hard
+** DONE Serialize Vec<Point> and build HNSW from Points instead
+CLOSED: [2023-11-29 Wed 08:22]
+
+[x] pull_db / serialize doesn't seem to work properly still, =scroll=
+fails with index 0 out of bounds, but second reload returns duplicates
+
 
 * [#A] Add support for distance formulas                               :core:
 

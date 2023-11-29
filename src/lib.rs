@@ -26,6 +26,9 @@ pub struct Twellik {
 
 #[wasm_bindgen]
 impl Twellik {
+    pub async fn close_db(&self) {
+        self.db.close()
+    }
     #[wasm_bindgen(constructor)]
     pub async fn new() -> Result<Twellik, JsValue> {
         console_error_panic_hook::set_once();
@@ -111,7 +114,11 @@ impl Twellik {
             log::debug("collection updated.");
         } else {
             let name = coll_name.to_string();
-            let hnsw = HnswIndex::default();
+            let mut hnsw = HnswIndex::default();
+            for new_point in new_points.clone() {
+                // TODO: check what if insert the same
+                hnsw.insert(new_point)
+            }
             let coll = Collection {
                 index: Box::new(hnsw),
                 points: new_points,

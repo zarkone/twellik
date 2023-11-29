@@ -27,6 +27,7 @@ impl Index for HnswIndex {
     fn insert(&mut self, point: Point) {
         let mut searcher: Searcher<u64> = Searcher::default();
         self.index.insert(point, &mut searcher);
+        log::debug(format!("point inserted. Collection length {:?}", self.index.len()).as_str());
     }
 
     fn scroll(&self, query: &Query) -> Vec<QueryResult> {
