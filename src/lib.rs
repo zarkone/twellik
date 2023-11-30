@@ -68,25 +68,28 @@ impl Twellik {
 
             let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
 
-            let archived_points = match rkyv::check_archived_root::<Vec<Point>>(&raw_points) {
+            let archived_points = match rkyv::check_archived_root::<HashMap<PointId, Point>>(
+                &raw_points,
+            ) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error("pull_db: error checking bytes of db value -- did you change the data or datastructure?");
                     return Err(e.to_string().into());
                 }
             };
-            let points: Vec<Point> = match archived_points.deserialize(&mut rkyv::Infallible) {
-                Ok(r) => r,
-                Err(e) => {
-                    log::error("pull_db: while trying to deserialize:");
-                    return Err(e.to_string().into());
-                }
-            };
+            let points: HashMap<PointId, Point> =
+                match archived_points.deserialize(&mut rkyv::Infallible) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log::error("pull_db: while trying to deserialize:");
+                        return Err(e.to_string().into());
+                    }
+                };
 
             let mut hnsw = HnswIndex::default();
 
-            for point in points.clone() {
-                hnsw.insert(point);
+            for (_id, point) in &points {
+                hnsw.insert(point.clone());
             }
 
             let coll = Collection {
@@ -101,27 +104,28 @@ impl Twellik {
         Ok(collections)
     }
     #[wasm_bindgen]
-    /// TODO: quadratic complexity here for now,
-    /// to be addressed after HNSW impl
     pub async fn upsert_points(&mut self, coll_name: &str, points: JsValue) -> Result<(), JsValue> {
         let new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
 
         if let Some(coll) = self.collections.get_mut(coll_name) {
-            for new_point in new_points {
-                // TODO: check what if insert the same
-                coll.index.insert(new_point)
+            for point in new_points {
+                if None == coll.points.get(&point.id) {
+                    coll.points.insert(point.id.clone(), point.clone());
+                    coll.index.insert(point)
+                }
             }
             log::debug("collection updated.");
         } else {
             let name = coll_name.to_string();
             let mut hnsw = HnswIndex::default();
-            for new_point in new_points.clone() {
-                // TODO: check what if insert the same
-                hnsw.insert(new_point)
+            let mut points: HashMap<PointId, Point> = HashMap::new();
+            for point in new_points {
+                points.insert(point.id.clone(), point.clone());
+                hnsw.insert(point);
             }
             let coll = Collection {
                 index: Box::new(hnsw),
-                points: new_points,
+                points,
                 name: name.clone(),
             };
             log::debug("new collection created.");
@@ -208,9 +212,15 @@ impl Twellik {
     }
 }
 
+type PointId = u32;
+
 struct Collection {
     pub name: String,
-    pub points: Vec<Point>,
+
+    // TODO: workaround to fix duplication
+    // TODO: workaround until I figured how to Archive HNSW
+    pub points: HashMap<PointId, Point>,
+
     pub index: Box<dyn Index>,
 }
 

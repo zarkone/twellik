@@ -58,6 +58,14 @@ CLOSED: [2023-11-29 Wed 08:22]
 [x] pull_db / serialize doesn't seem to work properly still, =scroll=
 fails with index 0 out of bounds, but second reload returns duplicates
 
+** DONE pictures in search duplicated after refresh
+CLOSED: [2023-11-30 Thu 08:15]
+
+when item is inserted, we don't check if it exist.
+We should check if it exist, by id.
+
+Need to find out if we can do it with HNSW index or rather we should
+have a hashtable of id => point
 
 * [#A] Add support for distance formulas                               :core:
 
