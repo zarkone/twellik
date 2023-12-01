@@ -1,3 +1,4 @@
+mod collection;
 mod dist;
 mod index;
 mod indexed_db;
@@ -7,8 +8,8 @@ mod query;
 
 extern crate console_error_panic_hook;
 
-use crate::index::HnswIndex;
-use crate::index::Index;
+use crate::collection::{Collection, PointId};
+use crate::index::{HnswIndex, Index};
 use crate::point::Point;
 use crate::query::{Query, QueryResult};
 use indexed_db_futures::IdbDatabase;
@@ -211,17 +212,3 @@ impl Twellik {
         Ok(serde_wasm_bindgen::to_value(&matched_points)?)
     }
 }
-
-type PointId = u32;
-
-struct Collection {
-    pub name: String,
-
-    // TODO: workaround to fix duplication
-    // TODO: workaround until I figured how to Archive HNSW
-    pub points: HashMap<PointId, Point>,
-
-    pub index: Box<dyn Index>,
-}
-
-impl Collection {}
