@@ -66,6 +66,8 @@ impl Twellik {
             };
 
             // TODO: should be async/nonblocking/point-by-point?
+            // test on bigger examples with animations
+            // find out how and where wasm module works
 
             let raw_points: Vec<u8> = serde_wasm_bindgen::from_value(js_points)?;
 
@@ -78,6 +80,7 @@ impl Twellik {
                     return Err(e.to_string().into());
                 }
             };
+
             let points: HashMap<PointId, Point> =
                 match archived_points.deserialize(&mut rkyv::Infallible) {
                     Ok(r) => r,
@@ -104,6 +107,7 @@ impl Twellik {
 
         Ok(collections)
     }
+
     #[wasm_bindgen]
     pub async fn upsert_points(&mut self, coll_name: &str, points: JsValue) -> Result<(), JsValue> {
         let new_points: Vec<Point> = serde_wasm_bindgen::from_value(points.clone())?;
