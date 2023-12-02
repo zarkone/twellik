@@ -61,10 +61,16 @@ impl Index for HnswIndex {
         for neighbor in &neighbors {
             let point = self.index.feature(neighbor.index);
 
-            result.push(QueryResult {
-                point: point.clone(),
-                distance: f64::from_bits(neighbor.distance),
-            })
+            // TODO: since we get exact amount of neighbours, we will return
+            // less points here.
+            // see "On attribute filtering"
+            let is_payload_matched = match_payload(&point.payload, &query_point.payload);
+            if is_payload_matched {
+                result.push(QueryResult {
+                    point: point.clone(),
+                    distance: f64::from_bits(neighbor.distance),
+                })
+            }
         }
 
         log::debug(

@@ -27,7 +27,8 @@ into vector db suitable vectors properly:
 
 https://www.pinecone.io/learn/clip-image-search/
 
-* IN-PROGRESS [#A] Hierarchical Navigable Small Worlds (HNSW)          :core:
+* DONE [#A] Hierarchical Navigable Small Worlds (HNSW)                 :core:
+CLOSED: [2023-12-02 Sat 13:44]
 
 [[https://www.pinecone.io/learn/series/faiss/hnsw/][Pinecone: HNSW]]
 [[https://arxiv.org/pdf/1603.09320.pdf][Efficient and robust approximate nearest neighbor search using
@@ -366,3 +367,34 @@ your code and data from existing popular vector DBs.
 Search]]
 
 [[https://qdrant.tech/articles/hybrid-search/][On hybrid search (qdrant)]]
+
+in qdrant src (commit 33bba705f3ac96c20f5dda98fb6289f00c6549d2):
+[[file+emacs:/home/zarkone/code/qdrant/lib/collection/src/shards/local_shard_operations.rs::107][local_shard_operation.rs]]
+#+begin_src rust
+        let mut points =
+            SegmentsSearcher::retrieve(segments, &point_ids, &with_payload, with_vector)?;
+        points.sort_by_key(|point| point.id);
+#+end_src
+
+looks like qdrant just makes search twice, by index points and by
+vector. and then somehow sorts results
+
+https://qdrant.tech/documentation/concepts/filtering/
+https://qdrant.tech/documentation/concepts/search/
+
+** On attribute filtering
+
+as a first, initial impl we can do just simple attribute filtering.
+basically the same as we've used to have before hnsw
+
+for this we probably need to have an index for payload.
+then we search all the matched points by attribute, an do vector
+search / distance calc only for this items, which were filtered
+
+... it feels like with this approach we don't need HNSW at all --
+however, need to check API if we can prefilter for example.
+
+We can also create a separate HNSW per payload index, -- not clear
+though how to build such indexes
+
+* [#B] npm package / webpack example                                :publish:
